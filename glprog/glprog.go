@@ -37,7 +37,7 @@ type Buff struct {
 }
 
 type Prog struct {
-	P          gles2.Program
+	P           gles2.Program
 	Vs          string
 	Fs          string
 	Mode        gles2.Enum
@@ -89,7 +89,7 @@ func (p *Prog) BuildProgram() {
 	//mark shaders for deletion when program is unlinked
 	gles2.DeleteShader(vshader)
 	gles2.DeleteShader(fshader)
-	
+
 	p.P = program
 	for i := range p.Uniforms {
 		p.Uniforms[i].Location = gles2.GetUniformLocation(p.P, p.Uniforms[i].Name)
