@@ -22,7 +22,7 @@ import (
 type State struct{}
 
 func (s *State) Decode(file assets.Asset) []int16 {
-	//buff_size := 4096
+	buff_size := 4096
 	fd := (*C.FILE)(unsafe.Pointer(file.Fd()))
 	err := C.int(0)
 	//C.stb_vorbis
@@ -36,13 +36,14 @@ func (s *State) Decode(file assets.Asset) []int16 {
 	//channels := info.channels
 	//log.Printf("%+v", info)
 
-	rbuff := make([]int16, 0, 4096)
-	cbuff := (*C.short)(C.malloc(2 * 4096))
+	//TODO: find raw data size to avoid realocation on append
+	rbuff := make([]int16, 0, 2 * buff_size * 20)
+	cbuff := (*C.short)(C.malloc(2 * C.ulong(buff_size)))
 	defer C.free(unsafe.Pointer(cbuff))
 	for {
 		// n - number of samples read per channel
 		// for 2 channels 16bit audio samples read is n*2, bytes read is n*4
-		n := C.stb_vorbis_get_samples_short_interleaved(sv, 2, cbuff, 4096)
+		n := C.stb_vorbis_get_samples_short_interleaved(sv, 2, cbuff, C.int(buff_size))
 		if n == 0 {
 			break
 		}
