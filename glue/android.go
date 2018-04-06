@@ -6,6 +6,9 @@
 
 package glue
 
+type platform struct {
+}
+
 func init() {
 	// Redirect Stderr and Stdout to logcat
 	enablePrinting()
@@ -18,6 +21,7 @@ func init() {
 // copy/paste from golang.org/x/mobile/internal/mobileinit
 /////////////////////////////////////////////////////////////////
 type infoWriter struct{}
+
 func (infoWriter) Write(p []byte) (n int, err error) {
 	cstr := C.CString(string(p))
 	C.__android_log_write(C.ANDROID_LOG_INFO, LogTag, cstr)
@@ -59,4 +63,3 @@ func enablePrinting() {
 	os.Stdout = w
 	go lineLog(r, C.ANDROID_LOG_INFO)
 }
-
