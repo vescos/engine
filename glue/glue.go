@@ -1,53 +1,35 @@
 package glue
 
 import (
-//"log"
+	//"log"
 
-//"graphs/engine/ext/size"
+	"graphs/engine/ext/key"
+	"graphs/engine/ext/size"
+	"graphs/engine/ext/touch"
 )
 
 type State interface {
+	// Lifetime events
 	InitState()
 	Create()
 	InitGL()
-	Size()
+	Size(new, old size.Event)
 	Resume()
 	StartDrawing()
 	Draw()
 	StopDrawing()
 	Pause()
 	Destroy()
+	// Input Events
+	Touch(t touch.Event)
+	Key(k key.Event)
 }
 
-type App struct {
-	State
+type Glue struct {
 	Flags       map[string]string
 	FbWidth     int
 	FbHeight    int
 	RefreshRate float32
-
+	// unexported fields
 	platform
-
-	//all
-	//commandQueue    chan int
-	//drawCmdQueue    chan int
-	//drawTerm        chan int
-	//windowConfig    chan size.Event
-
-}
-
-func (a *App) StartMainLoop() {
-
-	a.InitState()
-	//a.inputBlock =     make(chan int)
-	//a.drawCmdBlock=    make(chan int)
-	//inputQueue = make(chan *C.AInputQueue)
-
-	//a.commandQueue=   make(chan int, 100)
-	//a.drawCmdQueue=    make(chan int, 100)
-	//a.drawTerm=        make(chan int, 5)
-	//a.windowConfig=    make(chan size.Event, 100)
-
-	a.mainLoop()
-
 }
