@@ -22,7 +22,6 @@ import (
 
 type platform struct {
 	cRefs   *C.cRefs
-	oldSize size.Event
 }
 
 func init() {
@@ -30,8 +29,12 @@ func init() {
 }
 
 func (g *Glue) InitPlatform(s State) {
-	log.Printf(">>>>> Platform: %v/%v", runtime.GOARCH, runtime.GOOS)
+	g.PlatformString = runtime.GOARCH + "/" + runtime.GOOS
+	
+	log.Printf(">>>>> Platform: %v", g.PlatformString)
 
+	g.FbWidth = 600
+	g.FbHeight = 400
 	// Parse flags of type -flag=string
 	g.Flags = make(map[string]string)
 	for _, v := range os.Args[1:] {
@@ -57,21 +60,20 @@ func (g *Glue) StartMainLoop(s State) {
 	g.cRefs = (*C.cRefs)(C.cRefsPtr())
 	g.RefreshRate = float32(C.createWindow(C.int(g.FbWidth), C.int(g.FbHeight), g.cRefs))
 	s.InitGL()
-	size := size.Event{
+	sz := size.Event{
 		WidthPx:     int(g.FbWidth),
 		HeightPx:    int(g.FbHeight),
 		WidthPt:     float32(g.FbWidth),
 		HeightPt:    float32(g.FbHeight),
 		PixelsPerPt: 1.0,
 	}
-	s.Size(size, g.oldSize)
-	g.oldSize = size
+	s.Size(sz)
 	s.Resume()
 	s.StartDrawing()
 	for {
 		g.processEvents(s)
 		s.Draw()
-		// Swap buffers
+		// Swap buffers will block till vsync
 		if C.eglSwapBuffers(g.cRefs.eglDisplay, g.cRefs.eglSurface) == C.EGL_FALSE {
 			log.Printf("eglSwapBuffers failed  - exiting. EGL error: %v", eglGetError())
 			g.AppExit(s)
@@ -137,7 +139,7 @@ func (g *Glue) processEvents(s State) {
 			}
 		case C.ConfigureNotify:
 			cnEvent := (*C.XConfigureEvent)(unsafe.Pointer(&event))
-			size := size.Event{
+			sz := size.Event{
 				WidthPx:     int(cnEvent.width),
 				HeightPx:    int(cnEvent.height),
 				WidthPt:     float32(cnEvent.width),
@@ -146,8 +148,9 @@ func (g *Glue) processEvents(s State) {
 			}
 			g.FbWidth = int(cnEvent.width)
 			g.FbHeight = int(cnEvent.height)
-			s.Size(size, g.oldSize)
-			g.oldSize = size
+			s.Size(sz)
+			log.Printf(">>>>> WindowConfig: %vx%vpx at %vfps, density %v",
+				sz.WidthPx, sz.HeightPx, g.RefreshRate, sz.PixelsPerPt)
 		case C.KeyPress:
 			kpEvent := (*C.XKeyPressedEvent)(unsafe.Pointer(&event))
 			s.Key(key.Event{

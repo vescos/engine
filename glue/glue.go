@@ -13,7 +13,6 @@ type State interface {
 	InitState()
 	Create()
 	InitGL()
-	Size(new, old size.Event)
 	Resume()
 	StartDrawing()
 	Draw()
@@ -21,8 +20,9 @@ type State interface {
 	Pause()
 	Destroy()
 	// Input Events
-	Touch(t touch.Event)
-	Key(k key.Event)
+	Size(size.Event)
+	Touch(touch.Event)
+	Key(key.Event)
 }
 
 type Glue struct {
@@ -30,6 +30,7 @@ type Glue struct {
 	FbWidth     int
 	FbHeight    int
 	RefreshRate float32
+	PlatformString string
 	// unexported fields
 	platform
 }
