@@ -8,8 +8,3 @@ type Event struct {
 
 type Type int 
 
-const (
-	Down Type = iota
-	Up
-	Repeat
-)

@@ -35,8 +35,8 @@ func (g *Glue) InitPlatform(s State) {
 	
 	log.Printf(">>>>> Platform: %v", g.PlatformString)
 
-	g.FbWidth = 600
-	g.FbHeight = 400
+	g.FbWidth = 1280
+	g.FbHeight = 720
 	// Parse flags of type -flag=string
 	g.Flags = make(map[string]string)
 	for _, v := range os.Args[1:] {
