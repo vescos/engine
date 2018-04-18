@@ -96,7 +96,7 @@ func (p *Prog) BuildProgram() {
 	}
 }
 
-func DrawObject(prog *Prog, ctMaxTexureU int32) {
+func DrawObject(prog *Prog, ctMaxTexureU int) {
 	if prog.Length <= 0 {
 		return
 	}
@@ -140,7 +140,7 @@ func DrawObject(prog *Prog, ctMaxTexureU int32) {
 				}
 				count = int(v)
 				//FIXME: hardcoded to use unit 6 and 7 if limit is set to max 8
-				if ctMaxTexureU-1 < int32(k) {
+				if ctMaxTexureU-1 < k {
 					gles2.Uniform1i(prog.Uniforms["texture"].Location, 6)
 					gles2.Uniform1i(prog.Uniforms["texture_normal"].Location, 7)
 				} else {

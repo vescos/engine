@@ -15,9 +15,11 @@ import (
 	"strings"
 	"unsafe"
 	
-	"graphs/engine/ext/key"
-	"graphs/engine/ext/size"
-	"graphs/engine/ext/touch"
+	"graphs/engine/input/key"
+	"graphs/engine/input/size"
+	"graphs/engine/input/touch"
+	"graphs/engine/assets/cfd"
+	"graphs/engine/assets/gofd"
 )
 
 type platform struct {
@@ -56,7 +58,7 @@ func (g *Glue) InitPlatform(s State) {
 func (g *Glue) StartMainLoop(s State) {
 	s.InitState()
 	runtime.LockOSThread()
-	s.Create()
+	s.Load()
 	g.cRefs = (*C.cRefs)(C.cRefsPtr())
 	g.RefreshRate = float32(C.createWindow(C.int(g.FbWidth), C.int(g.FbHeight), g.cRefs))
 	s.InitGL()
@@ -67,9 +69,9 @@ func (g *Glue) StartMainLoop(s State) {
 		HeightPt:    float32(g.FbHeight),
 		PixelsPerPt: 1.0,
 	}
-	s.Size(sz)
 	s.Resume()
 	s.StartDrawing()
+	s.Size(sz)
 	for {
 		g.processEvents(s)
 		s.Draw()
@@ -87,6 +89,14 @@ func (g *Glue) AppExit(s State) {
 	s.Destroy()
 	os.Exit(0)
 	//time.AfterFunc(time.Millisecond*50, func() { os.Exit(0) })
+}
+
+func (g *Glue) CFdHandle (path string) (*cfd.State){
+	return &cfd.State{AssetsPath: path}
+}
+
+func (g *Glue) GoFdHandle (path string) (*gofd.State){
+	return &gofd.State{AssetsPath: path}
 }
 
 func (g *Glue) processEvents(s State) {

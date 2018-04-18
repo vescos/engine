@@ -3,15 +3,15 @@ package glue
 import (
 	//"log"
 
-	"graphs/engine/ext/key"
-	"graphs/engine/ext/size"
-	"graphs/engine/ext/touch"
+	"graphs/engine/input/key"
+	"graphs/engine/input/size"
+	"graphs/engine/input/touch"
 )
 
 type State interface {
 	// Lifetime events
 	InitState()
-	Create()
+	Load()
 	InitGL()
 	Resume()
 	StartDrawing()
