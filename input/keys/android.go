@@ -1,6 +1,6 @@
 // +build android
 
-package key
+package keys
 
 /*
 

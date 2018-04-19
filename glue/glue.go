@@ -3,7 +3,7 @@ package glue
 import (
 	//"log"
 
-	"graphs/engine/input/key"
+	"graphs/engine/input/keys"
 	"graphs/engine/input/size"
 	"graphs/engine/input/touch"
 )
@@ -22,7 +22,7 @@ type State interface {
 	// Input Events
 	Size(size.Event)
 	Touch(touch.Event)
-	Key(key.Event)
+	Key(keys.Event)
 }
 
 type Glue struct {

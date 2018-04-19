@@ -1,5 +1,5 @@
 // +build linux,!android
-package key
+package keys
 
 const (
 	Press Type = iota

@@ -1,4 +1,4 @@
-package key
+package keys
 
 type Event struct {
 	Code int

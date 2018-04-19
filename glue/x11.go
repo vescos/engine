@@ -17,7 +17,7 @@ import (
 
 	"graphs/engine/assets/cfd"
 	"graphs/engine/assets/gofd"
-	"graphs/engine/input/key"
+	"graphs/engine/input/keys"
 	"graphs/engine/input/size"
 	"graphs/engine/input/touch"
 )
@@ -163,9 +163,9 @@ func (g *Glue) processEvents(s State) {
 				sz.WidthPx, sz.HeightPx, g.RefreshRate, sz.PixelsPerPt)
 		case C.KeyPress:
 			kpEvent := (*C.XKeyPressedEvent)(unsafe.Pointer(&event))
-			s.Key(key.Event{
+			s.Key(keys.Event{
 				Code: int(kpEvent.keycode),
-				Type: key.Press,
+				Type: keys.Press,
 			})
 		case C.KeyRelease:
 			krEvent := (*C.XKeyPressedEvent)(unsafe.Pointer(&event))
@@ -179,17 +179,17 @@ func (g *Glue) processEvents(s State) {
 					if kpNev.time == krEvent.time && kpNev.keycode == krEvent.keycode {
 						//Clear next event
 						C.XNextEvent(g.cRefs.xDisplay, &event)
-						s.Key(key.Event{
+						s.Key(keys.Event{
 							Code: int(krEvent.keycode),
-							Type: key.Repeat,
+							Type: keys.Repeat,
 						})
 						break
 					}
 				}
 			}
-			s.Key(key.Event{
+			s.Key(keys.Event{
 				Code: int(krEvent.keycode),
-				Type: key.Release,
+				Type: keys.Release,
 			})
 			// End Switch
 		}
