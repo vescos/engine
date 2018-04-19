@@ -57,8 +57,8 @@ const fs = `
 	}
 `
 
-func Program () *glprog.Prog {
-	return &glprog.Prog {
+func Program() *glprog.Prog {
+	return &glprog.Prog{
 		Vs:          vs,
 		Fs:          fs,
 		Mode:        gles2.TRIANGLES,
@@ -141,5 +141,5 @@ func Program () *glprog.Prog {
 			},
 		},
 	}
-	
+
 }

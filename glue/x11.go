@@ -14,16 +14,16 @@ import (
 	"runtime"
 	"strings"
 	"unsafe"
-	
+
+	"graphs/engine/assets/cfd"
+	"graphs/engine/assets/gofd"
 	"graphs/engine/input/key"
 	"graphs/engine/input/size"
 	"graphs/engine/input/touch"
-	"graphs/engine/assets/cfd"
-	"graphs/engine/assets/gofd"
 )
 
 type platform struct {
-	cRefs   *C.cRefs
+	cRefs *C.cRefs
 }
 
 func init() {
@@ -32,7 +32,7 @@ func init() {
 
 func (g *Glue) InitPlatform(s State) {
 	g.PlatformString = runtime.GOARCH + "/" + runtime.GOOS
-	
+
 	log.Printf(">>>>> Platform: %v", g.PlatformString)
 
 	g.FbWidth = 1280
@@ -91,11 +91,11 @@ func (g *Glue) AppExit(s State) {
 	//time.AfterFunc(time.Millisecond*50, func() { os.Exit(0) })
 }
 
-func (g *Glue) CFdHandle (path string) (*cfd.State){
+func (g *Glue) CFdHandle(path string) *cfd.State {
 	return &cfd.State{AssetsPath: path}
 }
 
-func (g *Glue) GoFdHandle (path string) (*gofd.State){
+func (g *Glue) GoFdHandle(path string) *gofd.State {
 	return &gofd.State{AssetsPath: path}
 }
 
@@ -165,7 +165,7 @@ func (g *Glue) processEvents(s State) {
 			kpEvent := (*C.XKeyPressedEvent)(unsafe.Pointer(&event))
 			s.Key(key.Event{
 				Code: int(kpEvent.keycode),
-				Type: key.Down,
+				Type: key.Press,
 			})
 		case C.KeyRelease:
 			krEvent := (*C.XKeyPressedEvent)(unsafe.Pointer(&event))
@@ -189,7 +189,7 @@ func (g *Glue) processEvents(s State) {
 			}
 			s.Key(key.Event{
 				Code: int(krEvent.keycode),
-				Type: key.Up,
+				Type: key.Release,
 			})
 			// End Switch
 		}

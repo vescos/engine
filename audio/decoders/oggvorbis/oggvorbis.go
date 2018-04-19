@@ -37,7 +37,7 @@ func (s *State) Decode(file assets.Asset) []int16 {
 	//log.Printf("%+v", info)
 
 	//TODO: find raw data size to avoid realocation on append
-	rbuff := make([]int16, 0, 2 * buff_size * 20)
+	rbuff := make([]int16, 0, 2*buff_size*20)
 	cbuff := (*C.short)(C.malloc(2 * C.ulong(buff_size)))
 	defer C.free(unsafe.Pointer(cbuff))
 	for {

@@ -26,10 +26,10 @@ type State interface {
 }
 
 type Glue struct {
-	Flags       map[string]string
-	FbWidth     int
-	FbHeight    int
-	RefreshRate float32
+	Flags          map[string]string
+	FbWidth        int
+	FbHeight       int
+	RefreshRate    float32
 	PlatformString string
 	// unexported fields
 	platform

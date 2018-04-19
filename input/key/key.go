@@ -6,5 +6,4 @@ type Event struct {
 	// TODO: modifiers
 }
 
-type Type int 
-
+type Type int

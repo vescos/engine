@@ -32,7 +32,7 @@ const fs = `
 	}
 `
 
-func Program () *glprog.Prog {
+func Program() *glprog.Prog {
 	return &glprog.Prog{
 		Vs:     vs,
 		Fs:     fs,
@@ -73,5 +73,5 @@ func Program () *glprog.Prog {
 			},
 		},
 	}
-	
+
 }
