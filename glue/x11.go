@@ -31,6 +31,7 @@ func init() {
 }
 
 func (g *Glue) InitPlatform(s State) {
+	g.cRefs = (*C.cRefs)(C.cRefsPtr())
 	g.PlatformString = runtime.GOARCH + "/" + runtime.GOOS
 
 	log.Printf(">>>>> Platform: %v", g.PlatformString)
@@ -59,7 +60,6 @@ func (g *Glue) StartMainLoop(s State) {
 	s.InitState()
 	runtime.LockOSThread()
 	s.Load()
-	g.cRefs = (*C.cRefs)(C.cRefsPtr())
 	g.RefreshRate = float32(C.createWindow(C.int(g.FbWidth), C.int(g.FbHeight), g.cRefs))
 	s.InitGL()
 	sz := size.Event{
@@ -87,6 +87,7 @@ func (g *Glue) AppExit(s State) {
 	s.StopDrawing()
 	s.Pause()
 	s.Destroy()
+	C.free(unsafe.Pointer(g.cRefs))
 	os.Exit(0)
 	//time.AfterFunc(time.Millisecond*50, func() { os.Exit(0) })
 }

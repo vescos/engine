@@ -6,7 +6,25 @@
 
 package glue
 
+/*
+#cgo LDFLAGS: -lEGL -lGLESv2 -landroid -llog
+
+#include "android.h"
+*/
+import "C"
+import (
+	"log"
+	"unsafe"
+	"os"
+	"bufio"
+	"time"
+	
+	"graphs/engine/assets/cfd"
+	"graphs/engine/assets/gofd"
+)
+
 type platform struct {
+	cRefs *C.cRefs
 }
 
 func init() {
@@ -14,6 +32,109 @@ func init() {
 	enablePrinting()
 	log.Print(">>>>> Status: Initializing...")
 }
+
+func (g *Glue) InitPlatform (s State) {
+	g.cRefs = (*C.cRefs)(C.cRefsPtr())
+}
+
+func (g *Glue) StartMainLoop (s State) {
+	
+}
+
+func (g *Glue) AppExit (s State) {
+	C.free(unsafe.Pointer(g.cRefs))
+	C.ANativeActivity_finish(g.cRefs.aActivity)
+}
+
+func (g *Glue) CFdHandle(path string) *cfd.State {
+	return &cfd.State{AssetManager: unsafe.Pointer(g.cRefs.aActivity.assetManager)}
+}
+
+func (g *Glue) GoFdHandle(path string) *gofd.State {
+	return &gofd.State{AssetManager: unsafe.Pointer(g.cRefs.aActivity.assetManager)}
+}
+
+/////////////////////////////////////////////////////////////////
+// Android callbacks
+/////////////////////////////////////////////////////////////////
+//export onDestroy
+func onDestroy(activity *C.ANativeActivity) {
+}
+
+//export onStart
+func onStart(activity *C.ANativeActivity) {
+}
+
+//export onResume
+func onResume(activity *C.ANativeActivity) {
+}
+
+//export onPause
+func onPause(activity *C.ANativeActivity) {
+}
+
+//export onStop
+func onStop(activity *C.ANativeActivity) {
+}
+
+//export onLowMemory
+func onLowMemory(activity *C.ANativeActivity) {
+}
+
+//export onWindowFocusChanged
+func onWindowFocusChanged(activity *C.ANativeActivity, hasFocus C.int) {
+}
+
+//export onSaveInstanceState
+func onSaveInstanceState(activity *C.ANativeActivity, outSize *C.size_t) unsafe.Pointer {
+	return nil
+}
+
+//export onConfigurationChanged
+func onConfigurationChanged(activity *C.ANativeActivity) {
+}
+
+//export onNativeWindowCreated
+func onNativeWindowCreated(activity *C.ANativeActivity, window *C.ANativeWindow) {
+}
+
+//export onNativeWindowDestroyed
+func onNativeWindowDestroyed(activity *C.ANativeActivity, window *C.ANativeWindow) {
+}
+
+//export onNativeWindowRedrawNeeded
+func onNativeWindowRedrawNeeded(activity *C.ANativeActivity, window *C.ANativeWindow) {
+}
+
+//export onInputQueueCreated
+func onInputQueueCreated(activity *C.ANativeActivity, queue *C.AInputQueue) {
+}
+
+//export onInputQueueDestroyed
+func onInputQueueDestroyed(activity *C.ANativeActivity, queue *C.AInputQueue) {
+}
+
+//start main.main thread(goroutine) to listen for events comming from above callbacks
+//export callMain
+//func callMain(mainPC uintptr) {
+func callMain(activity *C.ANativeActivity, savedState unsafe.Pointer, savedStateSize int) {
+	//log.Print("glue.callMain")
+	// copy/paste from golang.org/x/mobile/app
+	// is this is required to init go runtime before call main???
+	for _, name := range []string{"TMPDIR", "PATH", "LD_LIBRARY_PATH"} {
+		n := C.CString(name)
+		os.Setenv(name, C.GoString(C.getenv(n)))
+		C.free(unsafe.Pointer(n))
+	}
+	var curtime C.time_t
+	var curtm C.struct_tm
+	C.time(&curtime)
+	C.localtime_r(&curtime, &curtm)
+	tzOffset := int(curtm.tm_gmtoff)
+	tz := C.GoString(curtm.tm_zone)
+	time.Local = time.FixedZone(tz, tzOffset)
+}
+
 
 /////////////////////////////////////////////////////////////////
 // Logging to logcat - printing to stderr, stdout with fmt.print
@@ -24,12 +145,16 @@ type infoWriter struct{}
 
 func (infoWriter) Write(p []byte) (n int, err error) {
 	cstr := C.CString(string(p))
-	C.__android_log_write(C.ANDROID_LOG_INFO, LogTag, cstr)
-	C.free(unsafe.Pointer(cstr))
+	defer C.free(unsafe.Pointer(cstr))
+	tag := C.CString(LogTag)
+	defer C.free(unsafe.Pointer(tag))
+	C.__android_log_write(C.ANDROID_LOG_INFO, tag, cstr)
 	return len(p), nil
 }
 func lineLog(f *os.File, priority C.int) {
 	r := bufio.NewReaderSize(f, LogSize)
+	tag := C.CString(LogTag)
+	defer C.free(unsafe.Pointer(tag))
 	for {
 		line, _, err := r.ReadLine()
 		str := string(line)
@@ -37,7 +162,7 @@ func lineLog(f *os.File, priority C.int) {
 			str += " " + err.Error()
 		}
 		cstr := C.CString(str)
-		C.__android_log_write(priority, LogTag, cstr)
+		C.__android_log_write(priority, tag, cstr)
 		C.free(unsafe.Pointer(cstr))
 		if err != nil {
 			break

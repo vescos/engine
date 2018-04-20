@@ -4,6 +4,7 @@ package keys
 
 /*
 
+#include <android/input.h>
 #include <android/keycodes.h>
 */
 import "C"

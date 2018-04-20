@@ -1,3 +1,5 @@
+// +build linux,!android
+
 #include <EGL/egl.h>
 #include <stdio.h>
 #include <stdlib.h>
