@@ -21,20 +21,26 @@ import (
 	
 	"graphs/engine/assets/cfd"
 	"graphs/engine/assets/gofd"
+	"graphs/engine/glue/internal/callfn"
 )
+
+// Used to link android onCreate with mainLoop
+// Global variable? Can be source of crashes and mess
+var linkGlue chan *C.cRefs
 
 type platform struct {
 	cRefs *C.cRefs
 }
 
 func init() {
+	linkGlue = make(chan *C.cRefs)
 	// Redirect Stderr and Stdout to logcat
 	enablePrinting()
 	log.Print(">>>>> Status: Initializing...")
 }
 
 func (g *Glue) InitPlatform (s State) {
-	g.cRefs = (*C.cRefs)(C.cRefsPtr())
+	g.cRefs = <- linkGlue
 }
 
 func (g *Glue) StartMainLoop (s State) {
@@ -114,10 +120,10 @@ func onInputQueueCreated(activity *C.ANativeActivity, queue *C.AInputQueue) {
 func onInputQueueDestroyed(activity *C.ANativeActivity, queue *C.AInputQueue) {
 }
 
-//start main.main thread(goroutine) to listen for events comming from above callbacks
+// start main.main thread(goroutine) to listen for events comming from above callbacks
+// derived from gomobile
 //export callMain
-//func callMain(mainPC uintptr) {
-func callMain(activity *C.ANativeActivity, savedState unsafe.Pointer, savedStateSize int) {
+func callMain(activity *C.ANativeActivity, savedState unsafe.Pointer, savedStateSize int, mainPC uintptr) {
 	//log.Print("glue.callMain")
 	// copy/paste from golang.org/x/mobile/app
 	// is this is required to init go runtime before call main???
@@ -133,6 +139,11 @@ func callMain(activity *C.ANativeActivity, savedState unsafe.Pointer, savedState
 	tzOffset := int(curtm.tm_gmtoff)
 	tz := C.GoString(curtm.tm_zone)
 	time.Local = time.FixedZone(tz, tzOffset)
+	
+	linkGlue <- (*C.cRefs)(C.cRefsPtr())
+	go func () {
+		callfn.CallFn(mainPC)
+	}()
 }
 
 

@@ -11,7 +11,7 @@ import (
 
 const (
 	LogTag  string = "LabyrinthEngine"
-	LogSize int    = 1024 // matches android/log.h.
+	LogSize int    = 1024 
 )
 
 /////////////////////////////////////////////////////////////////

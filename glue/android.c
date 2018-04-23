@@ -18,6 +18,8 @@ void * cRefsPtr() {
 	return NULL;
 } 
 
+
+// derived from gomobile
 jint JNI_OnLoad(JavaVM* vm, void* reserved) {
     JNIEnv* env;
     if ((*vm)->GetEnv(vm, (void**)&env, JNI_VERSION_1_6) != JNI_OK) {
@@ -33,22 +35,28 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 // Entry point for app
 // called when java.NativeActivity.onCreate is called
 // register callback functions here
+// derived from gomobile
 void ANativeActivity_onCreate(ANativeActivity* activity, void* savedState, size_t savedStateSize) {
 	// callbacks
 	activity->callbacks->onStart = onStart;
-    activity->callbacks->onResume = onResume;
-    activity->callbacks->onDestroy = onDestroy;
-    activity->callbacks->onPause = onPause;
-    activity->callbacks->onStop = onStop;
-    activity->callbacks->onWindowFocusChanged = onWindowFocusChanged;
-    activity->callbacks->onNativeWindowCreated = onNativeWindowCreated;
-    activity->callbacks->onConfigurationChanged = onConfigurationChanged;
-    activity->callbacks->onNativeWindowDestroyed = onNativeWindowDestroyed;
-    activity->callbacks->onNativeWindowRedrawNeeded = onNativeWindowRedrawNeeded;
-    activity->callbacks->onSaveInstanceState = onSaveInstanceState;
-    activity->callbacks->onLowMemory = onLowMemory;
-    activity->callbacks->onInputQueueCreated = onInputQueueCreated;
-    activity->callbacks->onInputQueueDestroyed = onInputQueueDestroyed;
+	activity->callbacks->onResume = onResume;
+	activity->callbacks->onDestroy = onDestroy;
+	activity->callbacks->onPause = onPause;
+	activity->callbacks->onStop = onStop;
+	activity->callbacks->onWindowFocusChanged = onWindowFocusChanged;
+	activity->callbacks->onNativeWindowCreated = onNativeWindowCreated;
+	activity->callbacks->onConfigurationChanged = onConfigurationChanged;
+	activity->callbacks->onNativeWindowDestroyed = onNativeWindowDestroyed;
+	activity->callbacks->onNativeWindowRedrawNeeded = onNativeWindowRedrawNeeded;
+	activity->callbacks->onSaveInstanceState = onSaveInstanceState;
+	activity->callbacks->onLowMemory = onLowMemory;
+	activity->callbacks->onInputQueueCreated = onInputQueueCreated;
+	activity->callbacks->onInputQueueDestroyed = onInputQueueDestroyed;
 
-	callMain(activity, savedState, savedStateSize);
+	// Call the Go main.main.
+	uintptr_t mainPC = (uintptr_t)dlsym(RTLD_DEFAULT, "main.main");
+	if (!mainPC) {
+		LOG_FATAL("missing main.main");
+	}
+	callMain(activity, savedState, savedStateSize, mainPC);
 }
