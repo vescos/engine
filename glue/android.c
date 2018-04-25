@@ -60,3 +60,69 @@ void ANativeActivity_onCreate(ANativeActivity* activity, void* savedState, size_
 	}
 	callMain(activity, savedState, savedStateSize, mainPC);
 }
+
+
+// EGL
+// main egl config
+const EGLint RGB_888[] = {
+    EGL_SAMPLES, 4,
+    EGL_BUFFER_SIZE, 32,
+    EGL_BLUE_SIZE, 8,
+    EGL_GREEN_SIZE, 8,
+    EGL_RED_SIZE, 8,
+    EGL_ALPHA_SIZE, 8,
+    EGL_DEPTH_SIZE, 24,
+    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+    EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+    EGL_CONFIG_CAVEAT, EGL_NONE,
+    EGL_NONE
+};
+// fallback egl config
+const EGLint RGB_565[] = {
+    EGL_BUFFER_SIZE, 16,
+    EGL_BLUE_SIZE, 5,
+    EGL_GREEN_SIZE, 6,
+    EGL_RED_SIZE, 5,
+    EGL_ALPHA_SIZE, 0,
+    EGL_DEPTH_SIZE, 16,
+    EGL_NONE
+};
+
+int getDisplay(cRefs * p) {
+	if (p == NULL) {
+		return 1;
+	}
+    p->eglDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    if (p->eglDisplay == EGL_NO_DISPLAY) {
+		return 1;
+	}
+    if (!eglInitialize(p->eglDisplay, NULL, NULL)) {
+        return 1;
+    }
+    return 0;
+}
+
+int setEGLConfig(cRefs * p) {
+	if (p == NULL) {
+		return 1;
+	}
+    EGLint numConfigs = 0;
+
+    if (!eglChooseConfig(p->eglDisplay, RGB_888, &(p->eglConfig), 1, &numConfigs)) {
+        return 1;
+    }
+    if (numConfigs <= 0) {
+        if (!eglChooseConfig(p->eglDisplay, RGB_565, &(p->eglConfig), 1, &numConfigs)) {
+            return 1;
+        }
+        if (numConfigs <= 0) {
+            return 1;
+        } else {
+            LOG_INFO(">>>>> EGL: choose RGB_565 config.");
+        }
+    } else {
+        LOG_INFO(">>>>> EGL: choose RGB_8888 config.");
+    }
+    
+    return 0;
+}

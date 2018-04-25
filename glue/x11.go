@@ -101,7 +101,6 @@ func (g *Glue) GoFdHandle(path string) *gofd.State {
 }
 
 func (g *Glue) processEvents(s State) {
-	maxEvents := 50
 	eventCounter := 0
 	for C.XPending(g.cRefs.xDisplay) > 0 && eventCounter < maxEvents {
 		eventCounter += 1

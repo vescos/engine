@@ -18,6 +18,7 @@ import (
 	"os"
 	"bufio"
 	"time"
+	"runtime"
 	
 	"graphs/engine/assets/cfd"
 	"graphs/engine/assets/gofd"
@@ -27,6 +28,8 @@ import (
 // Used to link android onCreate with mainLoop
 // Global variable? Can be source of crashes and mess
 var linkGlue chan *C.cRefs
+// armeabi version passed from Makefile(6 or 7)
+var goarm string = "0"
 
 type platform struct {
 	cRefs *C.cRefs
@@ -41,14 +44,40 @@ func init() {
 
 func (g *Glue) InitPlatform (s State) {
 	g.cRefs = <- linkGlue
+	
+	g.PlatformString = runtime.GOARCH + "/" + runtime.GOOS
+	log.Printf(">>>>> Platform: %v", g.PlatformString)
+	log.Printf(">>>>> SDK version: %v", C.AConfiguration_getSdkVersion(g.cRefs.aConfig))
+	if runtime.GOARCH == "arm" {
+		log.Printf(">>>>> ARM abi: %v", goarm)
+	}
+	// TODO: read sharedPreferences and set Flags
 }
 
 func (g *Glue) StartMainLoop (s State) {
+	s.InitState()
+	runtime.LockOSThread()
+	s.Load()
 	
+	// get/init default display
+	err := int(C.getDisplay(g.cRefs))
+	if err > 0 {
+		log.Printf("glue.draw.getDisplay: (%s)", eglGetError())
+		g.AppExit(s)
+	} else {
+		// setEGLConfig and createGLContext
+		err = int(C.setEGLConfig(g.cRefs))
+		if err > 0 {
+			log.Printf("glue.draw.setEGLConfig: (%s)", eglGetError())
+			g.AppExit(s)
+		}
+	}
+	for {
+		g.processEvents(s)
+	}
 }
 
 func (g *Glue) AppExit (s State) {
-	C.free(unsafe.Pointer(g.cRefs))
 	C.ANativeActivity_finish(g.cRefs.aActivity)
 }
 
@@ -124,7 +153,6 @@ func onInputQueueDestroyed(activity *C.ANativeActivity, queue *C.AInputQueue) {
 // derived from gomobile
 //export callMain
 func callMain(activity *C.ANativeActivity, savedState unsafe.Pointer, savedStateSize int, mainPC uintptr) {
-	//log.Print("glue.callMain")
 	// copy/paste from golang.org/x/mobile/app
 	// is this is required to init go runtime before call main???
 	for _, name := range []string{"TMPDIR", "PATH", "LD_LIBRARY_PATH"} {
@@ -140,9 +168,16 @@ func callMain(activity *C.ANativeActivity, savedState unsafe.Pointer, savedState
 	tz := C.GoString(curtm.tm_zone)
 	time.Local = time.FixedZone(tz, tzOffset)
 	
-	linkGlue <- (*C.cRefs)(C.cRefsPtr())
+	// TODO: savedState is dropped here - find platform independent method to store prefs
+	c := (*C.cRefs)(C.cRefsPtr())
+	c.aActivity = activity
+	c.aConfig = C.AConfiguration_new()
+	C.AConfiguration_fromAssetManager(c.aConfig, c.aActivity.assetManager)
+	linkGlue <- c
 	go func () {
 		callfn.CallFn(mainPC)
+		C.AConfiguration_delete(c.aConfig)
+		C.free(unsafe.Pointer(c))
 	}()
 }
 

@@ -11,7 +11,8 @@
 #include <android/native_activity.h>
 #include <android/native_window.h>
 
-void * cRefsPtr();
+#define LOG_INFO(...) __android_log_print(ANDROID_LOG_INFO, "LabyrinthEngine", __VA_ARGS__)
+#define LOG_FATAL(...) __android_log_print(ANDROID_LOG_FATAL, "LabyrinthEngine", __VA_ARGS__)
 
 typedef struct {
 	EGLContext	eglContext;
@@ -23,5 +24,6 @@ typedef struct {
 	AConfiguration *aConfig;
 } cRefs;
 
-#define LOG_INFO(...) __android_log_print(ANDROID_LOG_INFO, "LabyrinthEngine", __VA_ARGS__)
-#define LOG_FATAL(...) __android_log_print(ANDROID_LOG_FATAL, "LabyrinthEngine", __VA_ARGS__)
+void * cRefsPtr();
+int getDisplay(cRefs * p);
+int setEGLConfig(cRefs * p);
