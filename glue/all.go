@@ -12,7 +12,7 @@ import (
 const (
 	LogTag  string = "LabyrinthEngine"
 	LogSize int    = 1024
-	// max events to process on frame 
+	// max events to process on frame
 	maxEvents int = 50
 )
 

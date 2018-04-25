@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <dlfcn.h>
+#include <unistd.h>
 
 #include <EGL/egl.h>
 
@@ -27,3 +28,4 @@ typedef struct {
 void * cRefsPtr();
 int getDisplay(cRefs * p);
 int setEGLConfig(cRefs * p);
+

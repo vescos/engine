@@ -13,38 +13,81 @@ package glue
 */
 import "C"
 import (
-	"log"
-	"unsafe"
-	"os"
 	"bufio"
-	"time"
+	"log"
+	"os"
 	"runtime"
-	
+	"sync"
+	"time"
+	"unsafe"
+
 	"graphs/engine/assets/cfd"
 	"graphs/engine/assets/gofd"
 	"graphs/engine/glue/internal/callfn"
 )
 
 // Used to link android onCreate with mainLoop
-// Global variable? Can be source of crashes and mess
-var linkGlue chan *C.cRefs
+// linkGlue and linkGlueNextId are global variables readed/written from two threads
+// Use mutex.Lock/Unlock on read/write
+type linkGlue struct {
+	cRefs  *C.cRefs
+	comm   chan interface{}
+	linked bool
+}
+
+var linkGlueMap map[int]*linkGlue
+var linkGlueNextId int
+var linkGlueMutex sync.Mutex
+
 // armeabi version passed from Makefile(6 or 7)
 var goarm string = "0"
 
 type platform struct {
-	cRefs *C.cRefs
+	cRefs  *C.cRefs
+	linkId int
+	comm   chan interface{}
+	// draw flags
+	resumed       bool
+	hasFocus      bool
+	glInitialized bool
+	surfaceReady  bool
+	drawing       bool
 }
 
+type androidCmd int
+
+const (
+	cmdStart androidCmd = iota
+	cmdResume
+	cmdPause
+	cmdStop
+	cmdDestroy
+	cmdFocusOn
+	cmdFocusOff
+	cmdLowMemory
+)
+
 func init() {
-	linkGlue = make(chan *C.cRefs)
+	linkGlueMap = make(map[int]*linkGlue)
+
 	// Redirect Stderr and Stdout to logcat
 	enablePrinting()
 	log.Print(">>>>> Status: Initializing...")
 }
 
-func (g *Glue) InitPlatform (s State) {
-	g.cRefs = <- linkGlue
-	
+func (g *Glue) InitPlatform(s State) {
+	// Traverse entire linkGlueMap and link to first not linked entry
+	linkGlueMutex.Lock()
+	for key, val := range linkGlueMap {
+		if !val.linked {
+			// TODO: delete this key on onDestroy
+			g.linkId = key
+			g.cRefs = val.cRefs
+			val.linked = true
+		}
+	}
+	linkGlueMutex.Unlock()
+
 	g.PlatformString = runtime.GOARCH + "/" + runtime.GOOS
 	log.Printf(">>>>> Platform: %v", g.PlatformString)
 	log.Printf(">>>>> SDK version: %v", C.AConfiguration_getSdkVersion(g.cRefs.aConfig))
@@ -54,11 +97,11 @@ func (g *Glue) InitPlatform (s State) {
 	// TODO: read sharedPreferences and set Flags
 }
 
-func (g *Glue) StartMainLoop (s State) {
+func (g *Glue) StartMainLoop(s State) {
 	s.InitState()
 	runtime.LockOSThread()
 	s.Load()
-	
+
 	// get/init default display
 	err := int(C.getDisplay(g.cRefs))
 	if err > 0 {
@@ -77,7 +120,7 @@ func (g *Glue) StartMainLoop (s State) {
 	}
 }
 
-func (g *Glue) AppExit (s State) {
+func (g *Glue) AppExit(s State) {
 	C.ANativeActivity_finish(g.cRefs.aActivity)
 }
 
@@ -89,35 +132,100 @@ func (g *Glue) GoFdHandle(path string) *gofd.State {
 	return &gofd.State{AssetManager: unsafe.Pointer(g.cRefs.aActivity.assetManager)}
 }
 
+func (g *Glue) processEvents(s State) {
+	eventCounter := 0
+	for eventCounter < maxEvents {
+		eventCounter += 1
+		select {
+		default:
+			return
+		case ev := <-g.comm:
+			switch ev.(type) {
+			case androidCmd:
+				cmd := ev.(androidCmd)
+				switch cmd {
+				case cmdLowMemory:
+					// Not implemented
+				case cmdFocusOn:
+					g.hasFocus = true
+				case cmdFocusOff:
+					g.hasFocus = false
+				case cmdStart:
+					// Not implemented
+				case cmdResume:
+					s.Resume()
+					g.resumed = true
+				case cmdPause:
+					s.Pause()
+					g.resumed = false
+				case cmdStop:
+					g.glInitialized = false
+					if int(C.eglDestroyContext(g.cRefs.eglDisplay, g.cRefs.eglContext)) == 0 {
+						log.Printf("Glue: eglDestroyContext: (%s)", eglGetError())
+						g.AppExit(s)
+					}
+				case cmdDestroy:
+					s.Destroy()
+					delete(linkGlueMap, g.linkId)
+					return
+				default:
+					log.Print("Glue: unknown command:")
+				}
+			default:
+				log.Printf("Glue: unknown event type.")
+			}
+		}
+	}
+}
+
 /////////////////////////////////////////////////////////////////
 // Android callbacks
 /////////////////////////////////////////////////////////////////
 //export onDestroy
 func onDestroy(activity *C.ANativeActivity) {
+	tid := getThreadId()
+	linkGlueMap[tid].comm <- cmdDestroy
 }
 
 //export onStart
 func onStart(activity *C.ANativeActivity) {
+	tid := getThreadId()
+	linkGlueMap[tid].comm <- cmdStart
 }
 
 //export onResume
 func onResume(activity *C.ANativeActivity) {
+	tid := getThreadId()
+	linkGlueMap[tid].comm <- cmdResume
 }
 
 //export onPause
 func onPause(activity *C.ANativeActivity) {
+	tid := getThreadId()
+	linkGlueMap[tid].comm <- cmdPause
+	// TODO: save prefs
 }
 
 //export onStop
 func onStop(activity *C.ANativeActivity) {
+	tid := getThreadId()
+	linkGlueMap[tid].comm <- cmdStop
 }
 
 //export onLowMemory
 func onLowMemory(activity *C.ANativeActivity) {
+	tid := getThreadId()
+	linkGlueMap[tid].comm <- cmdLowMemory
 }
 
 //export onWindowFocusChanged
 func onWindowFocusChanged(activity *C.ANativeActivity, hasFocus C.int) {
+	tid := getThreadId()
+	if int(hasFocus) > 0 {
+		linkGlueMap[tid].comm <- cmdFocusOn
+	} else {
+		linkGlueMap[tid].comm <- cmdFocusOff
+	}
 }
 
 //export onSaveInstanceState
@@ -127,10 +235,13 @@ func onSaveInstanceState(activity *C.ANativeActivity, outSize *C.size_t) unsafe.
 
 //export onConfigurationChanged
 func onConfigurationChanged(activity *C.ANativeActivity) {
+	tid := getThreadId()
+	C.AConfiguration_fromAssetManager(linkGlueMap[tid].cRefs.aConfig, activity.assetManager)
 }
 
 //export onNativeWindowCreated
 func onNativeWindowCreated(activity *C.ANativeActivity, window *C.ANativeWindow) {
+
 }
 
 //export onNativeWindowDestroyed
@@ -167,20 +278,27 @@ func callMain(activity *C.ANativeActivity, savedState unsafe.Pointer, savedState
 	tzOffset := int(curtm.tm_gmtoff)
 	tz := C.GoString(curtm.tm_zone)
 	time.Local = time.FixedZone(tz, tzOffset)
-	
+
 	// TODO: savedState is dropped here - find platform independent method to store prefs
 	c := (*C.cRefs)(C.cRefsPtr())
 	c.aActivity = activity
 	c.aConfig = C.AConfiguration_new()
 	C.AConfiguration_fromAssetManager(c.aConfig, c.aActivity.assetManager)
-	linkGlue <- c
-	go func () {
+	tid := getThreadId()
+	linkGlueMutex.Lock()
+	linkGlueMap[tid] = &linkGlue{cRefs: c, comm: make(chan interface{}, 1000)}
+	linkGlueMutex.Unlock()
+	go func() {
 		callfn.CallFn(mainPC)
 		C.AConfiguration_delete(c.aConfig)
 		C.free(unsafe.Pointer(c))
 	}()
 }
 
+// Helper/wrapper function to get thread Id
+func getThreadId() int {
+	return int(C.gettid())
+}
 
 /////////////////////////////////////////////////////////////////
 // Logging to logcat - printing to stderr, stdout with fmt.print
