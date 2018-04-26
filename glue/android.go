@@ -24,15 +24,20 @@ import (
 	"graphs/engine/assets/cfd"
 	"graphs/engine/assets/gofd"
 	"graphs/engine/glue/internal/callfn"
+	"graphs/engine/input/keys"
+	"graphs/engine/input/size"
+	"graphs/engine/input/touch"
 )
 
 // Used to link android onCreate with mainLoop
 // linkGlue and linkGlueNextId are global variables readed/written from two threads
 // Use mutex.Lock/Unlock on read/write
 type linkGlue struct {
-	cRefs  *C.cRefs
-	comm   chan interface{}
-	linked bool
+	cRefs       *C.cRefs
+	comm        chan interface{}
+	blockInput  chan int
+	blockWindow chan int
+	linked      bool
 }
 
 var linkGlueMap map[int]*linkGlue
@@ -43,15 +48,20 @@ var linkGlueMutex sync.Mutex
 var goarm string = "0"
 
 type platform struct {
-	cRefs  *C.cRefs
-	linkId int
-	comm   chan interface{}
+	cRefs      *C.cRefs
+	linkId     int
+	comm       chan interface{}
+	inputQueue *C.AInputQueue
 	// draw flags
 	resumed       bool
 	hasFocus      bool
 	glInitialized bool
 	surfaceReady  bool
 	drawing       bool
+	callSize      bool
+	exitMain      bool
+	//window config
+	windowConfig size.Event
 }
 
 type androidCmd int
@@ -65,11 +75,13 @@ const (
 	cmdFocusOn
 	cmdFocusOff
 	cmdLowMemory
+	cmdConfigChange
+	cmdInputQueueDestroyed
+	cmdUnbindContext
 )
 
 func init() {
 	linkGlueMap = make(map[int]*linkGlue)
-
 	// Redirect Stderr and Stdout to logcat
 	enablePrinting()
 	log.Print(">>>>> Status: Initializing...")
@@ -98,6 +110,9 @@ func (g *Glue) InitPlatform(s State) {
 }
 
 func (g *Glue) StartMainLoop(s State) {
+	// sleep for 10ms if not drawing
+	// or block on eglSwapBuffers if drawing
+	var maxSleep time.Duration = 10
 	s.InitState()
 	runtime.LockOSThread()
 	s.Load()
@@ -117,6 +132,49 @@ func (g *Glue) StartMainLoop(s State) {
 	}
 	for {
 		g.processEvents(s)
+		g.processInputQueue(s)
+		// Destroy received - try to unlink and exit main loop
+		if g.exitMain {
+			linkGlueMutex.Lock()
+			if linkGlueMap[g.linkId].linked {
+				delete(linkGlueMap, g.linkId)
+			}
+			linkGlueMutex.Unlock()
+			return
+		}
+		// can we draw now???
+		if g.hasFocus && g.resumed && g.surfaceReady && g.windowConfig.WidthPx > 0 && g.windowConfig.HeightPx > 0 {
+			//YES
+			if !g.drawing {
+				g.drawing = true
+				s.StartDrawing()
+			}
+			if g.callSize {
+				s.Size(g.windowConfig)
+				//log.Printf(">>>>> WindowConfig: %vx%vpt(%vx%vpx) at %vfps, density %v",
+				//v.ctWidth, v.ctHeight, v.ctWidth*v.ctPixelsPerPt, v.ctHeight*v.ctPixelsPerPt,
+				//v.ctRefreshRate, v.ctPixelsPerPt)
+				//log.Printf(">>>>> RenderBuffSize set to: %vx%vpx", v.ctBufWidth, v.ctBufHeight)
+				g.callSize = false
+			}
+			s.Draw()
+			// this can realy blocks for some time waiting for vsync
+			// TODO: investigate if EGL_CONTEXT_LOST is possible and reinitialize
+			// "eglSwapBuffers performs an implicit flush operation on the context"
+			if C.eglSwapBuffers(g.cRefs.eglDisplay, g.cRefs.eglSurface) == C.EGL_FALSE {
+				log.Printf("eglSwapBuffers failed  - exiting. EGL error: %v", eglGetError())
+				g.AppExit(s)
+			}
+		} else {
+			if g.drawing {
+				g.drawing = false
+				// Not safe to use gl calls here - context can be unbound
+				s.StopDrawing()
+			}
+		}
+		if !g.drawing {
+			time.Sleep(time.Millisecond * maxSleep)
+		}
 	}
 }
 
@@ -141,9 +199,41 @@ func (g *Glue) processEvents(s State) {
 			return
 		case ev := <-g.comm:
 			switch ev.(type) {
+			case *size.Event:
+				g.windowConfig = *(ev.(*size.Event))
+				g.callSize = true
+			case *C.ANativeWindow:
+				g.cRefs.aWindow = ev.(*C.ANativeWindow)
+				g.bindContext(s)
+			case *C.AInputQueue:
+				g.processInputQueue(s)
+				g.inputQueue = ev.(*C.AInputQueue)
+				g.processInputQueue(s)
+				linkGlueMap[g.linkId].blockInput <- 1
 			case androidCmd:
 				cmd := ev.(androidCmd)
 				switch cmd {
+				case cmdUnbindContext:
+					g.surfaceReady = false
+					if C.eglMakeCurrent(g.cRefs.eglDisplay, nil, nil, nil) == C.EGL_FALSE {
+						log.Printf("Glue: eglMakeCurrent: %s", eglGetError())
+						g.AppExit(s)
+					} else {
+						if C.eglDestroySurface(g.cRefs.eglDisplay, g.cRefs.eglSurface) == C.EGL_FALSE {
+							log.Printf("Glue: eglDestroySurface failed: %s", eglGetError())
+							g.AppExit(s)
+						} else {
+							g.cRefs.eglSurface = nil
+						}
+					}
+					linkGlueMap[g.linkId].blockWindow <- 1
+					g.cRefs.aWindow = nil
+				case cmdInputQueueDestroyed:
+					g.processInputQueue(s)
+					g.inputQueue = nil
+					linkGlueMap[g.linkId].blockInput <- 1
+				case cmdConfigChange:
+					// Not implemented
 				case cmdLowMemory:
 					// Not implemented
 				case cmdFocusOn:
@@ -166,7 +256,7 @@ func (g *Glue) processEvents(s State) {
 					}
 				case cmdDestroy:
 					s.Destroy()
-					delete(linkGlueMap, g.linkId)
+					g.exitMain = true
 					return
 				default:
 					log.Print("Glue: unknown command:")
@@ -176,6 +266,106 @@ func (g *Glue) processEvents(s State) {
 			}
 		}
 	}
+}
+
+func (g *Glue) bindContext(s State) {
+	if g.cRefs.eglSurface != nil {
+		linkGlueMap[g.linkId].blockWindow <- 1
+		return
+	}
+	if err := int(C.createGLContext(g.cRefs)); err > 0 {
+		log.Printf("glue.draw.createGLContext: (%s)", eglGetError())
+		linkGlueMap[g.linkId].blockWindow <- 1
+		g.AppExit(s)
+		return
+	}
+	w := int(C.ANativeWindow_getWidth(g.cRefs.aWindow))
+	h := int(C.ANativeWindow_getHeight(g.cRefs.aWindow))
+	// limit surface size to stMaxBufWidth
+	//if w > stMaxBufWidth {
+	//h = (stMaxBufWidth * h) / w
+	//w = stMaxBufWidth
+	//}
+	g.FbWidth = w
+	g.FbHeight = h
+	if err := int(C.bindGLContext(g.cRefs, C.int(w), C.int(h))); err > 0 {
+		log.Printf("glue.draw.bindGLContext: (%s)", eglGetError())
+		linkGlueMap[g.linkId].blockWindow <- 1
+		g.AppExit(s)
+		return
+	}
+	g.surfaceReady = true
+	// onInitGL can take long and generate ANR so unblock Java thread before call
+	linkGlueMap[g.linkId].blockWindow <- 1
+	if !g.glInitialized {
+		g.glInitialized = true
+		s.InitGL()
+		// load gl resources(textures etc)
+	}
+}
+
+func (g *Glue) processInputQueue(s State) {
+	if g.inputQueue == nil {
+		return
+	}
+	var event *C.AInputEvent
+	for {
+		handled := 0
+		if C.AInputQueue_hasEvents(g.inputQueue) < 1 {
+			return
+		}
+		if C.AInputQueue_getEvent(g.inputQueue, &event) < 0 {
+			return
+		}
+		if C.AInputQueue_preDispatchEvent(g.inputQueue, event) == 0 {
+			handled = processInputEvent(s, event)
+			C.AInputQueue_finishEvent(g.inputQueue, event, C.int(handled))
+		} else if C.AConfiguration_getSdkVersion(g.cRefs.aConfig) < 16 {
+			C.AInputQueue_finishEvent(g.inputQueue, event, C.int(handled))
+		}
+	}
+}
+
+func processInputEvent(s State, e *C.AInputEvent) int {
+	handled := 0
+	switch C.AInputEvent_getType(e) {
+	case C.AINPUT_EVENT_TYPE_KEY:
+		c := int(C.AKeyEvent_getKeyCode(e))
+		t := keys.Type(C.AKeyEvent_getAction(e))
+		s.Key(keys.Event{
+			Code: int(c),
+			Type: t,
+		})
+		handled = 1
+	case C.AINPUT_EVENT_TYPE_MOTION:
+		// At most one of the events in this batch is an up or down event; get its index and change.
+		upDownIndex := C.size_t(C.AMotionEvent_getAction(e)&C.AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> C.AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT
+		upDownType := touch.TypeMove
+		switch C.AMotionEvent_getAction(e) & C.AMOTION_EVENT_ACTION_MASK {
+		case C.AMOTION_EVENT_ACTION_DOWN, C.AMOTION_EVENT_ACTION_POINTER_DOWN:
+			upDownType = touch.TypeBegin
+		case C.AMOTION_EVENT_ACTION_UP, C.AMOTION_EVENT_ACTION_POINTER_UP:
+			upDownType = touch.TypeEnd
+		}
+
+		for i, n := C.size_t(0), C.AMotionEvent_getPointerCount(e); i < n; i++ {
+			t := touch.TypeMove
+			if i == upDownIndex {
+				t = upDownType
+			}
+			ev := touch.Event{
+				X:        float32(C.AMotionEvent_getX(e, i)),
+				Y:        float32(C.AMotionEvent_getY(e, i)),
+				Sequence: touch.Sequence(C.AMotionEvent_getPointerId(e, i)),
+				Type:     t,
+			}
+			s.Touch(ev)
+			handled = 1
+		}
+	default:
+		//log.Printf("unknown input event, type=%d", C.AInputEvent_getType(e))
+	}
+	return handled
 }
 
 /////////////////////////////////////////////////////////////////
@@ -237,27 +427,43 @@ func onSaveInstanceState(activity *C.ANativeActivity, outSize *C.size_t) unsafe.
 func onConfigurationChanged(activity *C.ANativeActivity) {
 	tid := getThreadId()
 	C.AConfiguration_fromAssetManager(linkGlueMap[tid].cRefs.aConfig, activity.assetManager)
+	linkGlueMap[tid].comm <- cmdConfigChange
 }
 
 //export onNativeWindowCreated
 func onNativeWindowCreated(activity *C.ANativeActivity, window *C.ANativeWindow) {
-
+	tid := getThreadId()
+	linkGlueMap[tid].comm <- window
+	<-linkGlueMap[tid].blockWindow
 }
 
 //export onNativeWindowDestroyed
 func onNativeWindowDestroyed(activity *C.ANativeActivity, window *C.ANativeWindow) {
+	tid := getThreadId()
+	linkGlueMap[tid].comm <- cmdUnbindContext
+	<-linkGlueMap[tid].blockWindow
 }
 
 //export onNativeWindowRedrawNeeded
 func onNativeWindowRedrawNeeded(activity *C.ANativeActivity, window *C.ANativeWindow) {
+	tid := getThreadId()
+	linkGlueMap[tid].comm <- getWindowConfig(activity, window)
 }
 
 //export onInputQueueCreated
 func onInputQueueCreated(activity *C.ANativeActivity, queue *C.AInputQueue) {
+	if queue != nil {
+		tid := getThreadId()
+		linkGlueMap[tid].comm <- queue
+		<-linkGlueMap[tid].blockInput
+	}
 }
 
 //export onInputQueueDestroyed
 func onInputQueueDestroyed(activity *C.ANativeActivity, queue *C.AInputQueue) {
+	tid := getThreadId()
+	linkGlueMap[tid].comm <- cmdInputQueueDestroyed
+	<-linkGlueMap[tid].blockInput
 }
 
 // start main.main thread(goroutine) to listen for events comming from above callbacks
@@ -284,6 +490,7 @@ func callMain(activity *C.ANativeActivity, savedState unsafe.Pointer, savedState
 	c.aActivity = activity
 	c.aConfig = C.AConfiguration_new()
 	C.AConfiguration_fromAssetManager(c.aConfig, c.aActivity.assetManager)
+	// TODO: instead of tid use TLS
 	tid := getThreadId()
 	linkGlueMutex.Lock()
 	linkGlueMap[tid] = &linkGlue{cRefs: c, comm: make(chan interface{}, 1000)}
@@ -298,6 +505,75 @@ func callMain(activity *C.ANativeActivity, savedState unsafe.Pointer, savedState
 // Helper/wrapper function to get thread Id
 func getThreadId() int {
 	return int(C.gettid())
+}
+
+/////////////////////////////////////////////////////////////////
+// window configuration
+/////////////////////////////////////////////////////////////////
+type windowConfig struct {
+	orientation size.Orientation
+	pixelsPerPt float32
+}
+
+func getWindowConfig(a *C.ANativeActivity, w *C.ANativeWindow) *size.Event {
+	cfg := windowConfigRead(a)
+	widthPx := int(C.ANativeWindow_getWidth(w))
+	heightPx := int(C.ANativeWindow_getHeight(w))
+	return &size.Event{
+		WidthPx:     widthPx,
+		HeightPx:    heightPx,
+		WidthPt:     float32(float32(widthPx) / cfg.pixelsPerPt),
+		HeightPt:    float32(float32(heightPx) / cfg.pixelsPerPt),
+		PixelsPerPt: cfg.pixelsPerPt,
+		Orientation: cfg.orientation,
+	}
+}
+
+//copy/paste from mobile/app
+func windowConfigRead(activity *C.ANativeActivity) windowConfig {
+	aconfig := C.AConfiguration_new()
+	C.AConfiguration_fromAssetManager(aconfig, activity.assetManager)
+	orient := C.AConfiguration_getOrientation(aconfig)
+	density := C.AConfiguration_getDensity(aconfig)
+	C.AConfiguration_delete(aconfig)
+
+	var dpi int
+	switch density {
+	case C.ACONFIGURATION_DENSITY_DEFAULT:
+		dpi = 160
+	case C.ACONFIGURATION_DENSITY_LOW,
+		C.ACONFIGURATION_DENSITY_MEDIUM,
+		213, // C.ACONFIGURATION_DENSITY_TV
+		C.ACONFIGURATION_DENSITY_HIGH,
+		320, // ACONFIGURATION_DENSITY_XHIGH
+		480, // ACONFIGURATION_DENSITY_XXHIGH
+		640: // ACONFIGURATION_DENSITY_XXXHIGH
+		dpi = int(density)
+	case C.ACONFIGURATION_DENSITY_NONE:
+		log.Print("android device reports no screen density")
+		dpi = 72
+	default:
+		log.Printf("android device reports unknown density: %d", density)
+		// All we can do is guess.
+		if density > 0 {
+			dpi = int(density)
+		} else {
+			dpi = 72
+		}
+	}
+
+	o := size.OrientationUnknown
+	switch orient {
+	case C.ACONFIGURATION_ORIENTATION_PORT:
+		o = size.OrientationPortrait
+	case C.ACONFIGURATION_ORIENTATION_LAND:
+		o = size.OrientationLandscape
+	}
+
+	return windowConfig{
+		orientation: o,
+		pixelsPerPt: float32(dpi) / 72,
+	}
 }
 
 /////////////////////////////////////////////////////////////////

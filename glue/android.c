@@ -106,23 +106,60 @@ int setEGLConfig(cRefs * p) {
 	if (p == NULL) {
 		return 1;
 	}
-    EGLint numConfigs = 0;
+	EGLint numConfigs = 0;
 
-    if (!eglChooseConfig(p->eglDisplay, RGB_888, &(p->eglConfig), 1, &numConfigs)) {
-        return 1;
-    }
-    if (numConfigs <= 0) {
-        if (!eglChooseConfig(p->eglDisplay, RGB_565, &(p->eglConfig), 1, &numConfigs)) {
-            return 1;
-        }
-        if (numConfigs <= 0) {
-            return 1;
-        } else {
-            LOG_INFO(">>>>> EGL: choose RGB_565 config.");
-        }
-    } else {
-        LOG_INFO(">>>>> EGL: choose RGB_8888 config.");
-    }
-    
-    return 0;
+	if (!eglChooseConfig(p->eglDisplay, RGB_888, &(p->eglConfig), 1, &numConfigs)) {
+		return 1;
+	}
+	if (numConfigs <= 0) {
+		if (!eglChooseConfig(p->eglDisplay, RGB_565, &(p->eglConfig), 1, &numConfigs)) {
+			return 1;
+		}
+		if (numConfigs <= 0) {
+			return 1;
+		} else {
+			LOG_INFO(">>>>> EGL: choose RGB_565 config.");
+		}
+	} else {
+		LOG_INFO(">>>>> EGL: choose RGB_8888 config.");
+	}
+
+	return 0;
+}
+
+int createGLContext(cRefs *p) {
+	if (p == NULL) {
+		return 1;
+	} 
+	if (p->eglContext != NULL) {
+		return 0;
+	}
+	const EGLint contextAttribs[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
+	p->eglContext = eglCreateContext(p->eglDisplay, p->eglConfig, EGL_NO_CONTEXT, contextAttribs);
+	if (p->eglContext == EGL_NO_CONTEXT) {
+		return 1;
+	}
+	return 0;
+}
+
+int bindGLContext(cRefs *p, int w, int h) {
+	if (p == NULL) {
+		return 1;
+	}
+
+	EGLint format;
+
+	eglGetConfigAttrib(p->eglDisplay, p->eglConfig, EGL_NATIVE_VISUAL_ID, &format);
+	if (ANativeWindow_setBuffersGeometry(p->aWindow, w, h, format) != 0) {
+		return 1;
+	}
+
+	p->eglSurface = eglCreateWindowSurface(p->eglDisplay, p->eglConfig, p->aWindow, NULL);
+	if (p->eglSurface == EGL_NO_SURFACE) {
+		return 1;
+	}
+	if (eglMakeCurrent(p->eglDisplay, p->eglSurface, p->eglSurface, p->eglContext) == EGL_FALSE) {
+		return 1;
+	}
+	return 0;
 }
