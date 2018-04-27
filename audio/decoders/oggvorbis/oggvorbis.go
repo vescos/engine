@@ -38,7 +38,7 @@ func (s *State) Decode(file assets.Asset) []int16 {
 
 	//TODO: find raw data size to avoid realocation on append
 	rbuff := make([]int16, 0, 2*buff_size*20)
-	cbuff := (*C.short)(C.malloc(2 * C.ulong(buff_size)))
+	cbuff := (*C.short)(C.malloc(C.size_t(2 * buff_size)))
 	defer C.free(unsafe.Pointer(cbuff))
 	for {
 		// n - number of samples read per channel
