@@ -50,7 +50,6 @@ var goarm string = "0"
 type platform struct {
 	cRefs      *C.cRefs
 	linkId     int
-	comm       chan interface{}
 	inputQueue *C.AInputQueue
 	// draw flags
 	resumed       bool
@@ -92,7 +91,6 @@ func (g *Glue) InitPlatform(s State) {
 	linkGlueMutex.Lock()
 	for key, val := range linkGlueMap {
 		if !val.linked {
-			// TODO: delete this key on onDestroy
 			g.linkId = key
 			g.cRefs = val.cRefs
 			val.linked = true
@@ -197,7 +195,7 @@ func (g *Glue) processEvents(s State) {
 		select {
 		default:
 			return
-		case ev := <-g.comm:
+		case ev := <-linkGlueMap[g.linkId].comm:
 			switch ev.(type) {
 			case *size.Event:
 				g.windowConfig = *(ev.(*size.Event))
@@ -493,7 +491,12 @@ func callMain(activity *C.ANativeActivity, savedState unsafe.Pointer, savedState
 	// TODO: instead of tid use TLS
 	tid := getThreadId()
 	linkGlueMutex.Lock()
-	linkGlueMap[tid] = &linkGlue{cRefs: c, comm: make(chan interface{}, 1000)}
+	linkGlueMap[tid] = &linkGlue{
+		cRefs: c,
+		comm: make(chan interface{}, 1000), 
+		blockInput: make(chan int),
+		blockWindow: make(chan int),
+	}
 	linkGlueMutex.Unlock()
 	go func() {
 		callfn.CallFn(mainPC)
