@@ -9,13 +9,13 @@ package audio
 import "C"
 import (
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
+	//"os"
+	//"os/signal"
+	//"syscall"
 	"unsafe"
 )
 
-func openDevice(aParams *AudioParams) *C.snd_pcm_t {
+func openDevice(aParams *AudioParams) unsafe.Pointer {
 	//FIXME: alocate handle in C memory
 	var handle *C.snd_pcm_t
 	name := C.CString("hw:0,0") //device name "hw:0,0" "default" is used by pulse audio
@@ -26,16 +26,16 @@ func openDevice(aParams *AudioParams) *C.snd_pcm_t {
 		handle = nil
 		log.Printf("Audio: can't open audio device: %v, E: %v", C.GoString(name), C.GoString(C.snd_strerror(C.int(err))))
 	}
-	return handle
+	return unsafe.Pointer(handle)
 }
 
-func setAsyncWriteChan() chan os.Signal {
-	sigioc := make(chan os.Signal, 10)
-	signal.Notify(sigioc, syscall.SIGIO)
-	return sigioc
-}
+//func setAsyncWriteChan() chan os.Signal {
+//sigioc := make(chan os.Signal, 10)
+//signal.Notify(sigioc, syscall.SIGIO)
+//return sigioc
+//}
 
-func setParams(handle *C.snd_pcm_t, aParams *AudioParams) bool {
+func setParams(handle unsafe.Pointer, aParams *AudioParams) bool {
 	state := setHWParams(handle, aParams)
 	if state {
 		state = setSWParams(handle, aParams)
@@ -46,7 +46,8 @@ func setParams(handle *C.snd_pcm_t, aParams *AudioParams) bool {
 	return state
 }
 
-func setHWParams(handle *C.snd_pcm_t, aParams *AudioParams) bool {
+func setHWParams(h unsafe.Pointer, aParams *AudioParams) bool {
+	handle := (*C.snd_pcm_t)(h)
 	rate := C.uint(aParams.SampleRate)
 	channels := C.uint(aParams.Channels)
 	period_time := C.uint(aParams.PeriodTime)
@@ -122,7 +123,8 @@ func setHWParams(handle *C.snd_pcm_t, aParams *AudioParams) bool {
 	return true
 }
 
-func setSWParams(handle *C.snd_pcm_t, aParams *AudioParams) bool {
+func setSWParams(h unsafe.Pointer, aParams *AudioParams) bool {
+	handle := (*C.snd_pcm_t)(h)
 	var params *C.snd_pcm_sw_params_t
 
 	defer C.snd_pcm_sw_params_free(params)
@@ -157,21 +159,22 @@ func setSWParams(handle *C.snd_pcm_t, aParams *AudioParams) bool {
 }
 
 //export availWriteCallback
-func availWriteCallback(ahandler *C.snd_async_handler_t) {
-	//this function is never called
-	//"Notify disables the default behavior for a given set of asynchronous signals
-	//and instead delivers them over one or more registered channels"
-}
+//func availWriteCallback(ahandler *C.snd_async_handler_t) {
+//this function is never called
+//"Notify disables the default behavior for a given set of asynchronous signals
+//and instead delivers them over one or more registered channels"
+//}
 
-func setAvailWriteCallback(handle *C.snd_pcm_t) bool {
-	err := int(C.cSetAvailWriteCallback(handle))
-	if err < 0 {
-		return false
-	}
-	return true
-}
+//func setAvailWriteCallback(handle *C.snd_pcm_t) bool {
+//err := int(C.cSetAvailWriteCallback(handle))
+//if err < 0 {
+//return false
+//}
+//return true
+//}
 
-func writeBuff(handle *C.snd_pcm_t, buff []byte, aParams *AudioParams) (bool, int, bool) {
+func writeBuff(h unsafe.Pointer, buff []byte, aParams *AudioParams) (bool, int, bool) {
+	handle := (*C.snd_pcm_t)(h)
 	frames := C.snd_pcm_uframes_t(len(buff) / int(aParams.frameSize))
 
 	err := int(C.snd_pcm_avail_update(handle))
@@ -199,7 +202,8 @@ func writeBuff(handle *C.snd_pcm_t, buff []byte, aParams *AudioParams) (bool, in
 	return true, err * aParams.Channels * aParams.SampleSize, true
 }
 
-func closeDevice(handle *C.snd_pcm_t) {
+func closeDevice(h unsafe.Pointer) {
+	handle := (*C.snd_pcm_t)(h)
 	if handle != nil {
 		C.snd_pcm_close(handle)
 	}

@@ -14,22 +14,22 @@ import (
 	"time"
 )
 
-type Cmd int
+type cmd int
 
 const (
 	// control player
-	CmdPlayerStop Cmd = iota
-	CmdPlayerMute
-	CmdPlayerUnmute
-	CmdPlayerPause
-	CmdPlayerResume
+	cmdPlayerStop cmd = iota
+	cmdPlayerMute
+	cmdPlayerUnmute
+	cmdPlayerPause
+	cmdPlayerResume
 	// control sources
-	CmdSourceRemove
+	cmdSourceRemove
 	// control streams
-	CmdStreamPlay
-	CmdStreamPause
-	CmdStreamRestart
-	CmdStreamRemove
+	cmdStreamPlay
+	cmdStreamPause
+	cmdStreamRestart
+	cmdStreamRemove
 )
 
 type streamType int
@@ -43,7 +43,7 @@ const (
 
 type ctlSource struct {
 	name string
-	cmd  Cmd
+	cmd  cmd
 }
 
 type stream struct {
@@ -94,7 +94,7 @@ type addGroupStream struct {
 
 type ctlStream struct {
 	streamId string
-	cmd      Cmd
+	cmd      cmd
 	complete bool
 }
 
@@ -125,72 +125,36 @@ const (
 	splitStr      string = "__!__"
 	emptyStreamId string = "sgweedgtehbxc235SDFfsd@#Fs_"
 	rbc           int    = 15876 * 5 // why 79385
+	maxEvents     int    = 20
+	maxSleep      int    = 5 // in ms
 )
 
-func poller(player *Player) {
-	log.Print(">>>>> audio: Start.")
-	if !player.initialized {
-		player.sources = make(map[string]*Source, 0)
-		player.streams = make(map[string]*stream, 0)
-		player.play = true
-		player.initialized = true
-		player.emptyStreamIdCount = 0
-	}
-
-	write_avail := true
-	sigioc := setAsyncWriteChan()
-
-	random := rand.New(rand.NewSource(time.Now().UnixNano()))
-
-	var (
-		mix_buff  []byte
-		ring_buff [rbc]byte
-		rbs       int = 0 // ring buff start
-	)
-
-	// HARDCODED for now
-	params := &AudioParams{
-		//AccessMode: ModeInterleaved,
-		SampleRate:  44100,
-		SampleSize:  2,
-		Channels:    2,
-		PeriodTime:  30 * 1000, // 30ms //TODO: test latency vs performance
-		BuffSizeCnt: 3,
-	}
-	handle := openDevice(params)
-
-	if handle != nil {
-		player.state = setParams(handle, params)
-	}
-
-	mix_buff = ring_buff[:0:params.buffBytes]
-
-	// player loop
-	for {
+func (player *Player) processEvents() {
+	eventCounter := 0
+	for eventCounter < maxEvents {
+		eventCounter += 1
 		select {
-		// TODO: SLES backend - use sigioc chan to signal that write is available instead of using synchronous writes
-		default: // don't block on select, instead sleep on loop end
-		// comm with output buffer
-		case <-sigioc:
-			write_avail = true
+		default:
+			return
 		// communication with main thread
 		case e := <-player.in:
 			switch e.(type) {
-			case Cmd:
-				command := e.(Cmd)
+			case cmd:
+				command := e.(cmd)
 				switch command {
-				case CmdPlayerStop:
-					closeDevice(handle)
+				case cmdPlayerStop:
+					closeDevice(player.handle)
+					player.handle = nil
 					player.state = false
 					log.Print("<<<<< audio: Stop.")
 					return
-				case CmdPlayerMute:
+				case cmdPlayerMute:
 					player.mute = true
-				case CmdPlayerUnmute:
+				case cmdPlayerUnmute:
 					player.mute = false
-				case CmdPlayerPause:
+				case cmdPlayerPause:
 					player.play = false
-				case CmdPlayerResume:
+				case cmdPlayerResume:
 					player.play = true
 				}
 			case *Source:
@@ -208,7 +172,7 @@ func poller(player *Player) {
 				}
 			case *ctlSource:
 				ctl := e.(*ctlSource)
-				if ctl.cmd == CmdSourceRemove {
+				if ctl.cmd == cmdSourceRemove {
 					//delete streams for given source
 					for key, stream := range player.streams {
 						if stream.srcName == ctl.name {
@@ -220,15 +184,15 @@ func poller(player *Player) {
 			case *ctlStream:
 				ctl := e.(*ctlStream)
 				if _, ok := player.streams[ctl.streamId]; ok {
-					if ctl.cmd == CmdStreamPause {
+					if ctl.cmd == cmdStreamPause {
 						if !ctl.complete {
 							player.streams[ctl.streamId].playing = false
 						}
 						player.streams[ctl.streamId].paused = true
-					} else if ctl.cmd == CmdStreamPlay {
+					} else if ctl.cmd == cmdStreamPlay {
 						player.streams[ctl.streamId].playing = true
 						player.streams[ctl.streamId].paused = false
-					} else if ctl.cmd == CmdStreamRemove {
+					} else if ctl.cmd == cmdStreamRemove {
 						if ctl.complete && player.streams[ctl.streamId].playing {
 							player.streams[ctl.streamId].deleted = true
 							//rename stream to allow reuse of streamId
@@ -240,7 +204,7 @@ func poller(player *Player) {
 						} else {
 							delete(player.streams, ctl.streamId)
 						}
-					} else if ctl.cmd == CmdStreamRestart {
+					} else if ctl.cmd == cmdStreamRestart {
 						player.streams[ctl.streamId].playing = true
 						player.streams[ctl.streamId].paused = false
 						player.streams[ctl.streamId].readAt = 0
@@ -299,7 +263,7 @@ func poller(player *Player) {
 						max:        ctl.max,
 					}
 					if ctl.play {
-						rd := random.Intn(int(ctl.max-ctl.min)) + int(ctl.min)
+						rd := player.rand.Intn(int(ctl.max-ctl.min)) + int(ctl.min)
 						st := time.Now().Add(time.Duration(rd) * time.Millisecond)
 						player.streams[ctl.streamId].startTime = st
 					}
@@ -348,7 +312,7 @@ func poller(player *Player) {
 						interval:   ctl.interval,
 					}
 					if ctl.play {
-						rd := random.Intn(int(len(filtered_src)))
+						rd := player.rand.Intn(int(len(filtered_src)))
 						if _, ok := player.sources[filtered_src[rd]]; !ok {
 							log.Printf("Audio: Group: Source is not in the map - Name: %v", filtered_src[rd])
 						} else {
@@ -362,6 +326,49 @@ func poller(player *Player) {
 				log.Printf("Audio: in_chann: Unknown type: %T", e)
 			}
 		}
+	}
+}
+
+func poller(player *Player) {
+	log.Print(">>>>> audio: Start.")
+	if !player.initialized {
+		player.sources = make(map[string]*Source, 0)
+		player.streams = make(map[string]*stream, 0)
+		player.initialized = true
+		player.emptyStreamIdCount = 0
+	}
+
+	write_avail := true
+	//sigioc := setAsyncWriteChan()
+
+	player.rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+	var (
+		mix_buff  []byte
+		ring_buff [rbc]byte
+		rbs       int = 0 // ring buff start
+	)
+
+	// HARDCODED for now
+	params := &AudioParams{
+		//AccessMode: ModeInterleaved,
+		SampleRate:  44100,
+		SampleSize:  2,
+		Channels:    2,
+		PeriodTime:  30 * 1000, // 30ms //TODO: test latency vs performance
+		BuffSizeCnt: 3,
+	}
+	player.handle = openDevice(params)
+
+	if player.handle != nil {
+		player.state = setParams(player.handle, params)
+	}
+
+	mix_buff = ring_buff[:0:params.buffBytes]
+
+	// player loop
+	for {
+		player.processEvents()
 		// Mixer
 		// Mix multiple streams into single stream and write result to output buffer
 		if player.state && player.play && write_avail {
@@ -398,13 +405,13 @@ func poller(player *Player) {
 									stream.readAt = 0
 									stream.playing = false
 									stream.srcName = ""
-									rd := random.Intn(int(len(stream.src)))
+									rd := player.rand.Intn(int(len(stream.src)))
 									//try not to repeat
 									if stream.lastGroupRd == rd {
-										rd = random.Intn(int(len(stream.src)))
+										rd = player.rand.Intn(int(len(stream.src)))
 									}
 									if stream.lastGroupRd == rd {
-										rd = random.Intn(int(len(stream.src)))
+										rd = player.rand.Intn(int(len(stream.src)))
 									}
 									if _, ok := player.sources[stream.src[rd]]; !ok {
 										log.Printf("Audio: Group: Source is not in the map - Name: %v", stream.src[rd])
@@ -417,7 +424,7 @@ func poller(player *Player) {
 								} else if stream.streamType == typeRand {
 									stream.readAt = 0
 									stream.playing = false
-									rd := random.Intn(int(stream.max-stream.min)) + int(stream.min)
+									rd := player.rand.Intn(int(stream.max-stream.min)) + int(stream.min)
 									st := time.Now().Add(time.Duration(rd) * time.Millisecond)
 									stream.startTime = st
 								} else {
@@ -456,7 +463,7 @@ func poller(player *Player) {
 			if n > 0 {
 				var cnt int // how many bytes are written to output
 				//write_avail = false
-				player.state, cnt, write_avail = writeBuff(handle, mix_buff[:n], params)
+				player.state, cnt, write_avail = writeBuff(player.handle, mix_buff[:n], params)
 
 				rbs += cnt
 				if rbs+params.buffBytes > rbc {
@@ -472,6 +479,6 @@ func poller(player *Player) {
 
 			}
 		}
-		time.Sleep(time.Millisecond * 5)
+		time.Sleep(time.Millisecond * time.Duration(maxSleep))
 	}
 }

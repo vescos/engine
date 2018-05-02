@@ -22,7 +22,7 @@ import (
 type State struct{}
 
 func (s *State) Decode(file assets.Asset) []int16 {
-	buff_size := 4096-32
+	buff_size := 4096 - 32
 	fd := (*C.FILE)(unsafe.Pointer(file.Fd()))
 	err := C.int(0)
 	//C.stb_vorbis

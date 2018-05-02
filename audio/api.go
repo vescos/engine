@@ -1,12 +1,14 @@
-//Veselin Kostov April, 2017
+// Veselin Kostov April, 2017
 
-//TODO: not thread safe
-//Start, Stop are not thread safe
-//all other functions are thread safe but only if they happen between Start and Stop
+// TODO: streaming instead of load entire audio file
+// TODO: pass AudioParams at NewPlayer instead of hardcoded
 package audio
 
 import (
 	"log"
+	"math/rand"
+	"sync"
+	"unsafe"
 
 	"graphs/engine/assets"
 	"graphs/engine/audio/decoders/oggvorbis"
@@ -28,12 +30,25 @@ type Player struct {
 	emptyStreamIdCount int
 	sources            map[string]*Source
 	streams            map[string]*stream
+	handle             unsafe.Pointer
+	rand               *rand.Rand
+	// can be readed/writen from different goroutines
+	// use sync.Mutex
+	runing bool
+	mutex  sync.Mutex
 }
 
 //Start player
-func (p *Player) Start() {
-	p.in = make(chan interface{}, 100)
+func NewPlayer(p *Player) *Player {
+	if p == nil {
+		p = &Player{}
+		p.in = make(chan interface{}, 100)
+	}
 	go poller(p)
+	p.mutex.Lock()
+	p.runing = true
+	p.mutex.Unlock()
+	return p
 }
 
 // Load wav file and add as source
@@ -76,7 +91,7 @@ func (p *Player) AddSourceStruct(s *Source) {
 // Remove source and all streams that use this source
 // FIXME: remove source that belong to group stream will crash engine
 func (p *Player) RemoveSource(name string) {
-	p.in <- &ctlSource{name: name, cmd: CmdSourceRemove}
+	p.in <- &ctlSource{name: name, cmd: cmdSourceRemove}
 }
 
 // Play source once - no control
@@ -104,39 +119,46 @@ func (p *Player) AddGroupStream(src []string, streamId string, play bool, interv
 //Pause stream
 //if complete is true, current playng sound will be completed
 func (p *Player) PauseStream(streamId string, complete bool) {
-	p.in <- &ctlStream{streamId: streamId, cmd: CmdStreamPause, complete: complete}
+	p.in <- &ctlStream{streamId: streamId, cmd: cmdStreamPause, complete: complete}
 }
 
 func (p *Player) PlayStream(streamId string) {
-	p.in <- &ctlStream{streamId: streamId, cmd: CmdStreamPlay}
+	p.in <- &ctlStream{streamId: streamId, cmd: cmdStreamPlay}
 }
 
 func (p *Player) RestartStream(streamId string) {
-	p.in <- &ctlStream{streamId: streamId, cmd: CmdStreamRestart}
+	p.in <- &ctlStream{streamId: streamId, cmd: cmdStreamRestart}
 }
 
 //Remove stream
 //if complete is true, current playng sound will be completed
 func (p *Player) RemoveStream(streamId string, complete bool) {
-	p.in <- &ctlStream{streamId: streamId, cmd: CmdStreamRemove, complete: complete}
+	p.in <- &ctlStream{streamId: streamId, cmd: cmdStreamRemove, complete: complete}
 }
 
 func (p *Player) Mute() {
-	p.in <- CmdPlayerMute
+	p.in <- cmdPlayerMute
 }
 
 func (p *Player) Unmute() {
-	p.in <- CmdPlayerUnmute
+	p.in <- cmdPlayerUnmute
 }
 
 func (p *Player) Pause() {
-	p.in <- CmdPlayerPause
+	p.in <- cmdPlayerPause
 }
 
 func (p *Player) Resume() {
-	p.in <- CmdPlayerResume
+	p.in <- cmdPlayerResume
 }
 
-func (p *Player) Stop() { //TODO: reset
-	p.in <- CmdPlayerStop
+func (p *Player) Stop() {
+	p.mutex.Lock()
+	p.runing = false
+	p.mutex.Unlock()
+	p.in <- cmdPlayerStop
+}
+
+func (p *Player) IsRuning() bool {
+	return p.runing
 }

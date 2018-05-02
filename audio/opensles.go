@@ -31,12 +31,12 @@ func openDevice(aParams *AudioParams) unsafe.Pointer {
 	return handle
 }
 
-func setAsyncWriteChan() chan int {
-	//to avoid passing GO channel in C memory or keep channel as global var(shared library)
-	//writeBuff is synchronous
-	//create dummy channel
-	return make(chan int, 10)
-}
+//func setAsyncWriteChan() chan int {
+// to avoid passing GO channel in C memory or keep channel as global var(shared library)
+// writeBuff is synchronous
+// create dummy channel
+//return make(chan int, 10)
+//}
 
 func setParams(handle unsafe.Pointer, aParams *AudioParams) bool {
 	rate := C.uint(aParams.SampleRate)
