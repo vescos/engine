@@ -47,7 +47,9 @@ type ctlSource struct {
 }
 
 type stream struct {
-	srcName     string
+	srcName string
+	// To avoid map access in loop keep srcPtr here
+	srcPtr      *Source
 	src         []string
 	streamId    string
 	streamType  streamType
@@ -229,6 +231,7 @@ func (player *Player) processEvents() {
 					} else {
 						player.streams[stream_id] = &stream{
 							srcName:    ctl.srcName,
+							srcPtr:     player.sources[ctl.srcName],
 							streamId:   stream_id,
 							playing:    ctl.play,
 							readAt:     0,
@@ -254,6 +257,7 @@ func (player *Player) processEvents() {
 				} else {
 					player.streams[ctl.streamId] = &stream{
 						srcName:    ctl.srcName,
+						srcPtr:     player.sources[ctl.srcName],
 						streamId:   ctl.streamId,
 						playing:    false,
 						paused:     !ctl.play,
@@ -277,6 +281,7 @@ func (player *Player) processEvents() {
 				} else {
 					player.streams[ctl.streamId] = &stream{
 						srcName:    ctl.srcName,
+						srcPtr:     player.sources[ctl.srcName],
 						streamId:   ctl.streamId,
 						playing:    true,
 						paused:     !ctl.play,
@@ -317,6 +322,7 @@ func (player *Player) processEvents() {
 							log.Printf("Audio: Group: Source is not in the map - Name: %v", filtered_src[rd])
 						} else {
 							player.streams[ctl.streamId].srcName = filtered_src[rd]
+							player.streams[ctl.streamId].srcPtr = player.sources[filtered_src[rd]]
 							player.streams[ctl.streamId].playing = true
 							player.streams[ctl.streamId].lastGroupRd = rd
 						}
@@ -390,7 +396,7 @@ func poller(player *Player) {
 					for key, stream := range player.streams {
 						if stream.playing {
 							// stream ended: restart or delete stream
-							if player.sources[stream.srcName].length-stream.readAt < params.Channels {
+							if stream.srcPtr.length-stream.readAt < params.Channels {
 								if stream.deleted {
 									delete(player.streams, key) //safe to delete key in range
 									continue
@@ -417,6 +423,7 @@ func poller(player *Player) {
 										log.Printf("Audio: Group: Source is not in the map - Name: %v", stream.src[rd])
 									} else {
 										stream.srcName = stream.src[rd]
+										stream.srcPtr = player.sources[stream.src[rd]]
 										stream.lastGroupRd = rd
 										st := time.Now().Add(time.Duration(stream.interval) * time.Millisecond)
 										stream.startTime = st
@@ -435,9 +442,9 @@ func poller(player *Player) {
 							// mix streams and normalize audio
 							// TODO: optimize math
 							if !player.mute {
-								b0 := uint16(player.sources[stream.srcName].Buff[stream.readAt+0])
+								b0 := uint16(stream.srcPtr.Buff[stream.readAt])
 								f0 = (f0 + b0) - ((f0 * b0) / 65535)
-								b1 := uint16(player.sources[stream.srcName].Buff[stream.readAt+1])
+								b1 := uint16(stream.srcPtr.Buff[stream.readAt+1])
 								f1 = (f1 + b1) - ((f1 * b1) / 65535)
 								frame_has_val = true
 							}

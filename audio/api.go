@@ -2,6 +2,7 @@
 
 // TODO: streaming instead of load entire audio file
 // TODO: pass AudioParams at NewPlayer instead of hardcoded
+// TODO: audio strenght per stream and/or general
 package audio
 
 import (
