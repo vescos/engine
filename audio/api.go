@@ -43,8 +43,12 @@ type Player struct {
 func NewPlayer(p *Player) *Player {
 	if p == nil {
 		p = &Player{}
-		p.in = make(chan interface{}, 100)
+	} else {
+		if len(p.in) > 0 {
+			log.Printf("Audio: NewPlayer: discarding %v commands.", len(p.in))
+		}
 	}
+	p.in = make(chan interface{}, 100)
 	go poller(p)
 	p.mutex.Lock()
 	p.runing = true
@@ -160,6 +164,9 @@ func (p *Player) Stop() {
 	p.in <- cmdPlayerStop
 }
 
+// Stop() can happen between call to isRunning() and call to api.
+// As channel is buffered such calls will not block (almost till channel is full)
+// but all commands sent between Stop() and NewPlayer(stoped_player) will be discarded.
 func (p *Player) IsRuning() bool {
 	return p.runing
 }
