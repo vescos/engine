@@ -21,8 +21,8 @@ const (
 	CodeRight     = C.AKEYCODE_DPAD_RIGHT
 	CodeUp        = C.AKEYCODE_DPAD_UP
 	CodeDown      = C.AKEYCODE_DPAD_DOWN
-	CodeBack      = C.AKEYCODE_DEL
+	CodeBack      = C.AKEYCODE_BACK
 
-	//this is haedcoded against labyrinth game
+	//this is hardcoded against labyrinth game
 	CodeMove = C.AKEYCODE_DPAD_CENTER
 )

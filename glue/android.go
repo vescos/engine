@@ -1,6 +1,6 @@
-//glue is implemented using mainly this article
-//https://developer.nvidia.com/sites/default/files/akamai/mobile/docs/android_lifecycle_app_note.pdf
-//and investigating code in android_native_app_glue.c, golang.org/x/mobile
+// glue is implemented using mainly this article
+// https://developer.nvidia.com/sites/default/files/akamai/mobile/docs/android_lifecycle_app_note.pdf
+// and investigating code in android_native_app_glue.c, golang.org/x/mobile
 
 // +build android
 
@@ -113,6 +113,7 @@ func (g *Glue) StartMainLoop(s State) {
 	var maxSleep time.Duration = 10
 	s.InitState()
 	runtime.LockOSThread()
+	g.RefreshRate = float32(C.getRefreshRate(g.cRefs.aActivity))
 	s.Load()
 
 	// get/init default display
@@ -152,7 +153,7 @@ func (g *Glue) StartMainLoop(s State) {
 				//log.Printf(">>>>> WindowConfig: %vx%vpt(%vx%vpx) at %vfps, density %v",
 				//v.ctWidth, v.ctHeight, v.ctWidth*v.ctPixelsPerPt, v.ctHeight*v.ctPixelsPerPt,
 				//v.ctRefreshRate, v.ctPixelsPerPt)
-				//log.Printf(">>>>> RenderBuffSize set to: %vx%vpx", v.ctBufWidth, v.ctBufHeight)
+				log.Printf(">>>>> FbSize set to: %vx%vpx", g.FbWidth, g.FbHeight)
 				g.callSize = false
 			}
 			s.Draw()
@@ -186,6 +187,33 @@ func (g *Glue) CFdHandle(path string) *cfd.State {
 
 func (g *Glue) GoFdHandle(path string) *gofd.State {
 	return &gofd.State{AssetManager: unsafe.Pointer(g.cRefs.aActivity.assetManager)}
+}
+
+// can return 0 if w = ACONFIGURATION_SCREEN_WIDTH_DP_ANY
+func (g *Glue) ScreenWidth() int {
+	dpi := getDpi(g.cRefs.aConfig)
+	w := int(C.AConfiguration_getScreenWidthDp(g.cRefs.aConfig))
+	return w * dpi
+}
+// can return 0 if h = ACONFIGURATION_SCREEN_HEIGHT_DP_ANY
+func (g *Glue) ScreenHeight() int {
+	dpi := getDpi(g.cRefs.aConfig)
+	w := int(C.AConfiguration_getScreenHeightDp(g.cRefs.aConfig))
+	return w * dpi
+}
+
+func (g *Glue) WindowWidth() int {
+	if g.cRefs.aWindow == nil {
+		return 0
+	}
+	return int(C.ANativeWindow_getWidth(g.cRefs.aWindow))
+}
+
+func (g *Glue) WindowHeight() int {
+	if g.cRefs.aWindow == nil {
+		return 0
+	}
+	return int(C.ANativeWindow_getHeight(g.cRefs.aWindow))
 }
 
 func (g *Glue) processEvents(s State) {
@@ -279,14 +307,18 @@ func (g *Glue) bindContext(s State) {
 	}
 	w := int(C.ANativeWindow_getWidth(g.cRefs.aWindow))
 	h := int(C.ANativeWindow_getHeight(g.cRefs.aWindow))
-	// limit surface size to stMaxBufWidth
-	//if w > stMaxBufWidth {
-	//h = (stMaxBufWidth * h) / w
-	//w = stMaxBufWidth
-	//}
-	g.FbWidth = w
-	g.FbHeight = h
-	if err := int(C.bindGLContext(g.cRefs, C.int(w), C.int(h))); err > 0 {
+	// limit surface size to s.MaxFbWidth
+	if g.MaxFbWidth > 0 && w > g.MaxFbWidth {
+		h = (g.MaxFbWidth * h) / w
+		w = g.MaxFbWidth
+	}
+	if g.FbWidth <= 0 {
+		g.FbWidth = w
+	}
+	if g.FbHeight <= 0 {
+		g.FbHeight = h
+	}
+	if err := int(C.bindGLContext(g.cRefs, C.int(g.FbWidth), C.int(g.FbHeight))); err > 0 {
 		log.Printf("glue.draw.bindGLContext: (%s)", eglGetError())
 		linkGlueMap[g.linkId].blockWindow <- 1
 		g.AppExit(s)
@@ -535,11 +567,25 @@ func getWindowConfig(a *C.ANativeActivity, w *C.ANativeWindow) *size.Event {
 //copy/paste from mobile/app
 func windowConfigRead(activity *C.ANativeActivity) windowConfig {
 	aconfig := C.AConfiguration_new()
+	defer C.AConfiguration_delete(aconfig)
 	C.AConfiguration_fromAssetManager(aconfig, activity.assetManager)
 	orient := C.AConfiguration_getOrientation(aconfig)
-	density := C.AConfiguration_getDensity(aconfig)
-	C.AConfiguration_delete(aconfig)
+	o := size.OrientationUnknown
+	switch orient {
+	case C.ACONFIGURATION_ORIENTATION_PORT:
+		o = size.OrientationPortrait
+	case C.ACONFIGURATION_ORIENTATION_LAND:
+		o = size.OrientationLandscape
+	}
 
+	return windowConfig{
+		orientation: o,
+		pixelsPerPt: float32(getDpi(aconfig)) / 72,
+	}
+}
+
+func getDpi (aConfig *C.AConfiguration) int {
+	density := C.AConfiguration_getDensity(aConfig)
 	var dpi int
 	switch density {
 	case C.ACONFIGURATION_DENSITY_DEFAULT:
@@ -564,19 +610,7 @@ func windowConfigRead(activity *C.ANativeActivity) windowConfig {
 			dpi = 72
 		}
 	}
-
-	o := size.OrientationUnknown
-	switch orient {
-	case C.ACONFIGURATION_ORIENTATION_PORT:
-		o = size.OrientationPortrait
-	case C.ACONFIGURATION_ORIENTATION_LAND:
-		o = size.OrientationLandscape
-	}
-
-	return windowConfig{
-		orientation: o,
-		pixelsPerPt: float32(dpi) / 72,
-	}
+	return dpi
 }
 
 /////////////////////////////////////////////////////////////////

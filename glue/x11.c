@@ -98,12 +98,12 @@ static Window newWindow(int w, int h, cRefs *crefs) {
 short createWindow(int w, int h, cRefs * crefs) {
 	Window win;
 
-	XInitThreads();
-	crefs->xDisplay = XOpenDisplay(NULL);
-	if (!crefs->xDisplay) {
-		fprintf(stderr, "XOpenDisplay failed\n");
-		exit(1);
-	}
+	//XInitThreads();
+	//crefs->xDisplay = XOpenDisplay(NULL);
+	//if (!crefs->xDisplay) {
+		//fprintf(stderr, "XOpenDisplay failed\n");
+		//exit(1);
+	//}
 	crefs->eglDisplay = eglGetDisplay(crefs->xDisplay);
 	if (!crefs->eglDisplay) {
 		fprintf(stderr, "eglGetDisplay failed\n");

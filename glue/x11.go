@@ -24,6 +24,8 @@ import (
 
 type platform struct {
 	cRefs *C.cRefs
+	windowWidth int
+	windowHeight int
 }
 
 func init() {
@@ -36,8 +38,12 @@ func (g *Glue) InitPlatform(s State) {
 
 	log.Printf(">>>>> Platform: %v", g.PlatformString)
 
-	g.FbWidth = 1280
-	g.FbHeight = 720
+	g.cRefs.xDisplay = C.XOpenDisplay(nil)
+	if g.cRefs.xDisplay == nil {
+		log.Print("XOpenDisplay failed")
+		g.AppExit(s)
+	}
+
 	// Parse flags of type -flag=string
 	g.Flags = make(map[string]string)
 	for _, v := range os.Args[1:] {
@@ -59,8 +65,16 @@ func (g *Glue) InitPlatform(s State) {
 func (g *Glue) StartMainLoop(s State) {
 	s.InitState()
 	runtime.LockOSThread()
-	s.Load()
+	if g.FbWidth <= 0 {
+		g.FbWidth = g.ScreenWidth()
+	}
+	if g.FbHeight <= 0 {
+		g.FbHeight = g.ScreenHeight()
+	}
 	g.RefreshRate = float32(C.createWindow(C.int(g.FbWidth), C.int(g.FbHeight), g.cRefs))
+	g.windowWidth = g.FbWidth
+	g.windowHeight = g.FbHeight
+	s.Load()
 	s.InitGL()
 	sz := size.Event{
 		WidthPx:     int(g.FbWidth),
@@ -98,6 +112,32 @@ func (g *Glue) CFdHandle(path string) *cfd.State {
 
 func (g *Glue) GoFdHandle(path string) *gofd.State {
 	return &gofd.State{AssetsPath: path}
+}
+
+// Will work after InitPlatform call
+// and for screen 0
+func (g *Glue) ScreenWidth() int {
+	if g.cRefs.xDisplay == nil {
+		log.Print("ScreenWidth: xDisplay is nil!!!")
+		return 0
+	}
+	return int(C.XDisplayWidth(g.cRefs.xDisplay, 0))
+}
+
+func (g *Glue) ScreenHeight() int {
+	if g.cRefs.xDisplay == nil {
+		log.Print("ScreenHeight: xDisplay is nil!!!")
+		return 0
+	}
+	return int(C.XDisplayHeight(g.cRefs.xDisplay, 0))
+}
+
+func (g *Glue) WindowWidth() int {
+	return g.windowWidth
+}
+
+func (g *Glue) WindowHeight() int {
+	return g.windowHeight
 }
 
 func (g *Glue) processEvents(s State) {
@@ -158,6 +198,8 @@ func (g *Glue) processEvents(s State) {
 			}
 			g.FbWidth = int(cnEvent.width)
 			g.FbHeight = int(cnEvent.height)
+			g.windowWidth = g.FbWidth
+			g.windowHeight = g.FbHeight
 			s.Size(sz)
 			log.Printf(">>>>> WindowConfig: %vx%vpx at %vfps, density %v",
 				sz.WidthPx, sz.HeightPx, g.RefreshRate, sz.PixelsPerPt)

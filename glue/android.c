@@ -56,9 +56,53 @@ void ANativeActivity_onCreate(ANativeActivity* activity, void* savedState, size_
 	// Call the Go main.main.
 	uintptr_t mainPC = (uintptr_t)dlsym(RTLD_DEFAULT, "main.main");
 	if (!mainPC) {
-		LOG_FATAL("missing main.main");
+		LOG_ERROR("missing main.main");
 	}
 	callMain(activity, savedState, savedStateSize, mainPC);
+}
+
+static jclass findClass(JNIEnv *env, const char *class_name) {
+    jclass clazz = (*env)->FindClass(env, class_name);
+    if (clazz == NULL) {
+        (*env)->ExceptionClear(env);
+        LOG_ERROR("cannot find %s", class_name);
+        return NULL;
+    }
+    return clazz;
+}
+
+static jmethodID findMethod(JNIEnv *env, jclass clazz, const char *name, const char *sig) {
+    jmethodID m = (*env)->GetMethodID(env, clazz, name, sig);
+    if (m == 0) {
+        (*env)->ExceptionClear(env);
+        LOG_ERROR("cannot find method %s %s", name, sig);
+        return 0;
+    }
+    return m;
+}
+
+float getRefreshRate(ANativeActivity* activity) {
+	JNIEnv* env;
+	JavaVM* vm = activity->vm;
+	
+	(*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6);
+	(*vm)->AttachCurrentThread(vm, &env, NULL);
+
+	jclass  activityClass = (*env)->GetObjectClass(env, activity->clazz);
+	jmethodID getWindowManager = (*env)->GetMethodID(env, activityClass, "getWindowManager", "()Landroid/view/WindowManager;");
+
+	jobject wm = (jobject)(*env)->CallObjectMethod(env, activity->clazz, getWindowManager);
+	jclass wmClass = (*env)->FindClass(env, "android/view/WindowManager");
+	jmethodID getDefaultDisplay = (*env)->GetMethodID(env, wmClass, "getDefaultDisplay", "()Landroid/view/Display;");
+
+	jobject display = (jobject)(*env)->CallObjectMethod(env, wm, getDefaultDisplay);
+	jclass displayClass = (*env)->FindClass(env, "android/view/Display");
+	jmethodID getRefreshRateM = (*env)->GetMethodID(env, displayClass, "getRefreshRate", "()F");
+
+	float refreshRate = (float)(*env)->CallFloatMethod(env, display, getRefreshRateM);
+	
+	(*vm)->DetachCurrentThread(vm);
+	return refreshRate;
 }
 
 
