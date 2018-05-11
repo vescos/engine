@@ -51,7 +51,6 @@ var goarm string = "0"
 type platform struct {
 	cRefs      *C.cRefs
 	linkId     int
-	inputQueue *C.AInputQueue
 	// draw flags
 	resumed       bool
 	hasFocus      bool
@@ -217,6 +216,16 @@ func (g *Glue) WindowHeight() int {
 	return int(C.ANativeWindow_getHeight(g.cRefs.aWindow))
 }
 
+// Return reference to C struct and give access to
+// Activity and other android specific stuff. 
+// Not cross platform code. eg. use import "C" and
+// // +build android 
+
+
+func (g *Glue) HackPlatform() *C.cRefs{
+	return g.cRefs
+}
+
 func (g *Glue) processEvents(s State) {
 	eventCounter := 0
 	for eventCounter < maxEvents {
@@ -234,7 +243,7 @@ func (g *Glue) processEvents(s State) {
 				g.bindContext(s)
 			case *C.AInputQueue:
 				g.processInputQueue(s)
-				g.inputQueue = ev.(*C.AInputQueue)
+				g.cRefs.aInputQueue = ev.(*C.AInputQueue)
 				g.processInputQueue(s)
 				linkGlueMap[g.linkId].blockInput <- 1
 			case androidCmd:
@@ -257,7 +266,7 @@ func (g *Glue) processEvents(s State) {
 					g.cRefs.aWindow = nil
 				case cmdInputQueueDestroyed:
 					g.processInputQueue(s)
-					g.inputQueue = nil
+					g.cRefs.aInputQueue = nil
 					linkGlueMap[g.linkId].blockInput <- 1
 				case cmdConfigChange:
 					// Not implemented
@@ -336,23 +345,23 @@ func (g *Glue) bindContext(s State) {
 }
 
 func (g *Glue) processInputQueue(s State) {
-	if g.inputQueue == nil {
+	if g.cRefs.aInputQueue == nil {
 		return
 	}
 	var event *C.AInputEvent
 	for {
 		handled := 0
-		if C.AInputQueue_hasEvents(g.inputQueue) < 1 {
+		if C.AInputQueue_hasEvents(g.cRefs.aInputQueue) < 1 {
 			return
 		}
-		if C.AInputQueue_getEvent(g.inputQueue, &event) < 0 {
+		if C.AInputQueue_getEvent(g.cRefs.aInputQueue, &event) < 0 {
 			return
 		}
-		if C.AInputQueue_preDispatchEvent(g.inputQueue, event) == 0 {
+		if C.AInputQueue_preDispatchEvent(g.cRefs.aInputQueue, event) == 0 {
 			handled = processInputEvent(s, event)
-			C.AInputQueue_finishEvent(g.inputQueue, event, C.int(handled))
+			C.AInputQueue_finishEvent(g.cRefs.aInputQueue, event, C.int(handled))
 		} else if C.AConfiguration_getSdkVersion(g.cRefs.aConfig) < 16 {
-			C.AInputQueue_finishEvent(g.inputQueue, event, C.int(handled))
+			C.AInputQueue_finishEvent(g.cRefs.aInputQueue, event, C.int(handled))
 		}
 	}
 }

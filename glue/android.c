@@ -13,6 +13,7 @@ void * cRefsPtr() {
 		p->aActivity = NULL;
 		p->aWindow = NULL;
 		p->aConfig = NULL;
+		p->aInputQueue = NULL;
 		return (void *) p;
 	}
 	return NULL;

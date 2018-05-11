@@ -23,6 +23,7 @@ typedef struct {
 	ANativeActivity *aActivity;
 	ANativeWindow *aWindow;
 	AConfiguration *aConfig;
+	AInputQueue *aInputQueue;
 } cRefs;
 
 void * cRefsPtr();

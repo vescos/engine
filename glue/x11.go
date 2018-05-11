@@ -141,6 +141,14 @@ func (g *Glue) WindowHeight() int {
 	return g.windowHeight
 }
 
+// Return reference to C struct.
+// Allow access to X11.  
+// Not crossPlatform code. Use import "C" and 
+// // +build linux,!android
+func (g *Glue) HackPlatform() *C.cRefs {
+	return g.cRefs
+}
+
 func (g *Glue) processEvents(s State) {
 	eventCounter := 0
 	for C.XPending(g.cRefs.xDisplay) > 0 && eventCounter < maxEvents {
