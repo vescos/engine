@@ -11,6 +11,6 @@ type Asset interface {
 	Fd() uintptr
 }
 
-type OpenAsset interface {
+type FileManager interface {
 	OpenAsset(string) (Asset, error)
 }

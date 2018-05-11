@@ -58,7 +58,7 @@ func NewPlayer(p *Player) *Player {
 
 // Load wav file and add as source
 // Loading is happening in main thread, audio will block if loading is there
-func (p *Player) LoadWav(fname, streamName string, fhandle assets.OpenAsset) {
+func (p *Player) LoadWav(fname, streamName string, fhandle assets.FileManager) {
 	file, err := fhandle.OpenAsset(fname)
 	if err != nil {
 		log.Printf("Audio: loadStream: can't open file error: %v, filename: %v", err, fname)
@@ -72,7 +72,7 @@ func (p *Player) LoadWav(fname, streamName string, fhandle assets.OpenAsset) {
 
 // Load oggvorbis file and add as source
 // require cfile handle
-func (p *Player) LoadOgg(fname, streamName string, chandle assets.OpenAsset) {
+func (p *Player) LoadOgg(fname, streamName string, chandle assets.FileManager) {
 	file, err := chandle.OpenAsset(fname)
 	if err != nil {
 		log.Printf("Audio: loadStream: can't open file error: %v, filename: %v", err, fname)

@@ -15,8 +15,9 @@ import (
 	"strings"
 	"unsafe"
 
-	"graphs/engine/assets/cfd"
-	"graphs/engine/assets/gofd"
+	"graphs/engine/assets"
+	"graphs/engine/glue/internal/assets/cfd"
+	"graphs/engine/glue/internal/assets/gofd"
 	"graphs/engine/input/keys"
 	"graphs/engine/input/size"
 	"graphs/engine/input/touch"
@@ -106,11 +107,11 @@ func (g *Glue) AppExit(s State) {
 	//time.AfterFunc(time.Millisecond*50, func() { os.Exit(0) })
 }
 
-func (g *Glue) CFdHandle(path string) *cfd.State {
+func (g *Glue) CFdHandle(path string) assets.FileManager {
 	return &cfd.State{AssetsPath: path}
 }
 
-func (g *Glue) GoFdHandle(path string) *gofd.State {
+func (g *Glue) GoFdHandle(path string) assets.FileManager {
 	return &gofd.State{AssetsPath: path}
 }
 

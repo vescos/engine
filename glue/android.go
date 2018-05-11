@@ -21,8 +21,9 @@ import (
 	"time"
 	"unsafe"
 
-	"graphs/engine/assets/cfd"
-	"graphs/engine/assets/gofd"
+	"graphs/engine/assets"
+	"graphs/engine/glue/internal/assets/cfd"
+	"graphs/engine/glue/internal/assets/gofd"
 	"graphs/engine/glue/internal/callfn"
 	"graphs/engine/input/keys"
 	"graphs/engine/input/size"
@@ -181,11 +182,11 @@ func (g *Glue) AppExit(s State) {
 	C.ANativeActivity_finish(g.cRefs.aActivity)
 }
 
-func (g *Glue) CFdHandle(path string) *cfd.State {
+func (g *Glue) CFdHandle(path string) assets.FileManager {
 	return &cfd.State{AssetManager: unsafe.Pointer(g.cRefs.aActivity.assetManager)}
 }
 
-func (g *Glue) GoFdHandle(path string) *gofd.State {
+func (g *Glue) GoFdHandle(path string) assets.FileManager {
 	return &gofd.State{AssetManager: unsafe.Pointer(g.cRefs.aActivity.assetManager)}
 }
 
