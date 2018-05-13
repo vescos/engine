@@ -1,3 +1,8 @@
+// Ogg Vorbis audio decoder - v1.14 - public domain
+// http://nothings.org/stb_vorbis/
+//
+// Original version written by Sean Barrett in 2007.
+
 //////////////////////////////////////////////////////////////////////////////
 //
 //  HEADER BEGINS HERE

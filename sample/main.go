@@ -2,16 +2,16 @@ package main
 
 import (
 	"log"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 
-	"graphs/engine/input/keys"
-	"graphs/engine/input/size"
-	"graphs/engine/input/touch"
 	"graphs/engine/gles2"
 	"graphs/engine/glprog"
 	"graphs/engine/glue"
+	"graphs/engine/input/keys"
+	"graphs/engine/input/size"
+	"graphs/engine/input/touch"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 func main() {
 	s := &State{}
 	s.Glue = &glue.Glue{}
-	// glue call to setup platform dependent code 
+	// glue call to setup platform dependent code
 	// x11 backend will parse cmd flags
 	s.InitPlatform(s)
 	// set initial FB size in px

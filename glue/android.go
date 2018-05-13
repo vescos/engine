@@ -49,8 +49,8 @@ var linkGlueMutex sync.Mutex
 var goarm string = "0"
 
 type platform struct {
-	cRefs      *C.cRefs
-	linkId     int
+	cRefs  *C.cRefs
+	linkId int
 	// draw flags
 	resumed       bool
 	hasFocus      bool
@@ -195,6 +195,7 @@ func (g *Glue) ScreenWidth() int {
 	w := int(C.AConfiguration_getScreenWidthDp(g.cRefs.aConfig))
 	return w * dpi
 }
+
 // can return 0 if h = ACONFIGURATION_SCREEN_HEIGHT_DP_ANY
 func (g *Glue) ScreenHeight() int {
 	dpi := getDpi(g.cRefs.aConfig)
@@ -217,12 +218,10 @@ func (g *Glue) WindowHeight() int {
 }
 
 // Return reference to C struct and give access to
-// Activity and other android specific stuff. 
+// Activity and other android specific stuff.
 // Not cross platform code. eg. use import "C" and
-// // +build android 
-
-
-func (g *Glue) HackPlatform() *C.cRefs{
+// // +build android
+func (g *Glue) HackPlatform() *C.cRefs {
 	return g.cRefs
 }
 
@@ -534,9 +533,9 @@ func callMain(activity *C.ANativeActivity, savedState unsafe.Pointer, savedState
 	tid := getThreadId()
 	linkGlueMutex.Lock()
 	linkGlueMap[tid] = &linkGlue{
-		cRefs: c,
-		comm: make(chan interface{}, 1000), 
-		blockInput: make(chan int),
+		cRefs:       c,
+		comm:        make(chan interface{}, 1000),
+		blockInput:  make(chan int),
 		blockWindow: make(chan int),
 	}
 	linkGlueMutex.Unlock()
@@ -594,7 +593,7 @@ func windowConfigRead(activity *C.ANativeActivity) windowConfig {
 	}
 }
 
-func getDpi (aConfig *C.AConfiguration) int {
+func getDpi(aConfig *C.AConfiguration) int {
 	density := C.AConfiguration_getDensity(aConfig)
 	var dpi int
 	switch density {

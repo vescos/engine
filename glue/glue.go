@@ -27,11 +27,14 @@ type State interface {
 
 type Glue struct {
 	Flags          map[string]string
-	MaxFbWidth	int
+	MaxFbWidth     int
 	FbWidth        int
 	FbHeight       int
 	RefreshRate    float32
 	PlatformString string
+	// platform specific
+	LinuxConfigFile   string
+	AndroidConfigFile string
 	// unexported fields
 	platform
 }

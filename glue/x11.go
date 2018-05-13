@@ -24,8 +24,8 @@ import (
 )
 
 type platform struct {
-	cRefs *C.cRefs
-	windowWidth int
+	cRefs        *C.cRefs
+	windowWidth  int
 	windowHeight int
 }
 
@@ -142,8 +142,8 @@ func (g *Glue) WindowHeight() int {
 }
 
 // Return reference to C struct.
-// Allow access to X11.  
-// Not crossPlatform code. Use import "C" and 
+// Allow access to X11.
+// Not crossPlatform code. Use import "C" and
 // // +build linux,!android
 func (g *Glue) HackPlatform() *C.cRefs {
 	return g.cRefs
