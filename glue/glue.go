@@ -26,7 +26,7 @@ type State interface {
 }
 
 type Glue struct {
-	Flags          map[string]string
+	Config         map[string]string
 	MaxFbWidth     int
 	FbWidth        int
 	FbHeight       int

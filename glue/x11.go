@@ -12,8 +12,10 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"time"
 	"strings"
 	"unsafe"
+	"path/filepath"
 
 	"graphs/engine/assets"
 	"graphs/engine/glue/internal/assets/cfd"
@@ -27,6 +29,7 @@ type platform struct {
 	cRefs        *C.cRefs
 	windowWidth  int
 	windowHeight int
+	exitMain bool
 }
 
 func init() {
@@ -46,7 +49,17 @@ func (g *Glue) InitPlatform(s State) {
 	}
 
 	// Parse flags of type -flag=string
-	g.Flags = make(map[string]string)
+	g.Config = make(map[string]string)
+	
+	file, err := os.Open(g.LinuxConfigFile)
+	if err != nil {
+		if g.LinuxConfigFile != "" {
+			log.Printf("Can't open config file: %v, error: %v", g.LinuxConfigFile, err)
+		}
+	} else {
+		defer file.Close()
+		
+	}
 	for _, v := range os.Args[1:] {
 		sp := strings.SplitN(v, "=", 2)
 		if len(sp) < 2 {
@@ -59,7 +72,7 @@ func (g *Glue) InitPlatform(s State) {
 			continue
 		}
 		key := sp[0][1:]
-		g.Flags[key] = sp[1]
+		g.Config[key] = sp[1]
 	}
 }
 
@@ -88,6 +101,18 @@ func (g *Glue) StartMainLoop(s State) {
 	s.StartDrawing()
 	s.Size(sz)
 	for {
+		if g.exitMain {
+			s.StopDrawing()
+			s.Pause()
+			s.Destroy()
+			
+			// Block and give time to other goroutines to exit.
+			time.Sleep(time.Millisecond*50)
+			//time.AfterFunc(time.Millisecond*50, func() { os.Exit(0) })
+			C.free(unsafe.Pointer(g.cRefs))
+			// Return to main.main or caller.
+			return
+		}
 		g.processEvents(s)
 		s.Draw()
 		// Swap buffers will block till vsync
@@ -99,12 +124,27 @@ func (g *Glue) StartMainLoop(s State) {
 }
 
 func (g *Glue) AppExit(s State) {
-	s.StopDrawing()
-	s.Pause()
-	s.Destroy()
-	C.free(unsafe.Pointer(g.cRefs))
-	os.Exit(0)
-	//time.AfterFunc(time.Millisecond*50, func() { os.Exit(0) })
+	g.exitMain = true
+}
+
+func (g *Glue) SaveConfig(cfg map[string]string) {
+	if g.LinuxConfigFile == "" {
+		log.Print("SaveConfig: empty string LinuxConfigFile")
+		return
+	}
+	newSuffix := "_newcfg"
+	fname := filepath.Clean(os.ExpandEnv(g.LinuxConfigFile + newSuffix))
+	fdir := filepath.Dir(fname) 
+	os.MkdirAll(fdir, 0777)
+	file, err := os.OpenFile(fname, os.O_WRONLY | os.O_CREATE | os.O_EXCL, 0666)
+	if err != nil {
+		log.Printf("SaveConfig: can't create file: %v", fname)
+		return
+	}
+	defer file.Close()
+	for k, v := range g.Config {
+		log.Print(k, v)
+	}
 }
 
 func (g *Glue) CFdHandle(path string) assets.FileManager {

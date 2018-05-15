@@ -15,9 +15,9 @@ type State struct {
 
 func (s *State) OpenAsset(name string) (assets.Asset, error) {
 
-	dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
-	dir = filepath.Join(dir, s.AssetsPath)
-	name = filepath.Join(dir, name)
+	//dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
+	//dir = filepath.Join(dir, s.AssetsPath)
+	name = filepath.Join(s.AssetsPath, name)
 	f, err := os.Open(name)
 	if err != nil {
 		return nil, err
