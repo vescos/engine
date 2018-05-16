@@ -20,6 +20,7 @@ import (
 	"sync"
 	"time"
 	"unsafe"
+	"strings"
 
 	"graphs/engine/assets"
 	"graphs/engine/glue/internal/assets/cfd"
@@ -104,6 +105,12 @@ func (g *Glue) InitPlatform(s State) {
 	if runtime.GOARCH == "arm" {
 		log.Printf(">>>>> ARM abi: %v", goarm)
 	}
+	
+	cPkgName := C.getPackageName(g.cRefs.aActivity)
+	defer C.free(unsafe.Pointer(cPkgName))
+	pkgName := C.GoString(cPkgName)
+	
+	log.Print(pkgName)
 	// TODO: read sharedPreferences and set Flags
 }
 
@@ -179,6 +186,11 @@ func (g *Glue) StartMainLoop(s State) {
 
 func (g *Glue) AppExit(s State) {
 	C.ANativeActivity_finish(g.cRefs.aActivity)
+}
+
+func (g *Glue) SaveConfig(cfg map[string]string) bool {
+	// TODO:
+	return false
 }
 
 func (g *Glue) CFdHandle(path string) assets.FileManager {
@@ -509,13 +521,17 @@ func onInputQueueDestroyed(activity *C.ANativeActivity, queue *C.AInputQueue) {
 // derived from gomobile
 //export callMain
 func callMain(activity *C.ANativeActivity, savedState unsafe.Pointer, savedStateSize int, mainPC uintptr) {
+	// Set env vars - just a few vars are available on android
+	n := C.getNextEnv(0)
+	for i := 1; n != nil; i += 1 {
+		split := strings.SplitN(C.GoString(n), "=", 2)
+		if len(split) == 2 {
+			os.Setenv(split[0], split[1])
+			n = C.getNextEnv(C.int(i))
+		}
+	}
 	// copy/paste from golang.org/x/mobile/app
 	// is this is required to init go runtime before call main???
-	for _, name := range []string{"TMPDIR", "PATH", "LD_LIBRARY_PATH"} {
-		n := C.CString(name)
-		os.Setenv(name, C.GoString(C.getenv(n)))
-		C.free(unsafe.Pointer(n))
-	}
 	var curtime C.time_t
 	var curtm C.struct_tm
 	C.time(&curtime)

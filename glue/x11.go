@@ -83,7 +83,7 @@ func (g *Glue) InitPlatform(s State) {
 		for scanner.Scan() {
 			t := scanner.Text()
 			sp :=strings.SplitN(t, "=", 2)
-			if len(sp) < 2 {
+			if len(sp) != 2 {
 				log.Print("InitPlatform: Bad Config key: %v", sp)
 				continue
 			}
@@ -147,10 +147,10 @@ func (g *Glue) AppExit(s State) {
 	g.exitMain = true
 }
 
-func (g *Glue) SaveConfig(cfg map[string]string) {
+func (g *Glue) SaveConfig(cfg map[string]string) bool {
 	if g.LinuxConfigFile == "" {
 		log.Print("SaveConfig: empty string LinuxConfigFile")
-		return
+		return false
 	}
 	newSuffix := "_newcfg"
 	fname := filepath.Clean(os.ExpandEnv(g.LinuxConfigFile))
@@ -160,12 +160,17 @@ func (g *Glue) SaveConfig(cfg map[string]string) {
 	newFile, err := os.OpenFile(newFname, os.O_WRONLY | os.O_CREATE | os.O_EXCL | os.O_APPEND, 0644)
 	if err != nil {
 		log.Printf("SaveConfig: can't create file: %v", newFname)
-		return
+		return false
 	}
 	for k, v := range cfg {
-		// check for equal sign(=) into key
-		if strings.Contains(k, "=") {
-			log.Printf("SaveConfig: equal sign(=) is not allowed in config map keys, key: %v, ignoring", k)
+		// check for equal sign(=) or \n into key
+		if strings.ContainsAny(k, "=\n") {
+			log.Printf("SaveConfig: equal sign(=) and newline is not allowed in config map keys, key: %v, ignoring", k)
+			continue
+		}
+		// check for \n in value
+		if strings.Contains(v, "\n") {
+			log.Printf("SaveConfig: equal newline is not allowed in config map vals, val: %v, ignoring", v)
 			continue
 		}
 		_, err = newFile.WriteString(k + "=" + v + "\n")
@@ -173,7 +178,7 @@ func (g *Glue) SaveConfig(cfg map[string]string) {
 			log.Print("SaveConfig: can't save config file")
 			newFile.Close()
 			os.Remove(newFname)
-			return
+			return false
 		}
 	}
 	newFile.Close()
@@ -181,7 +186,9 @@ func (g *Glue) SaveConfig(cfg map[string]string) {
 	if err != nil {
 		log.Printf("SaveConfig: can't rename newconf to oldconf, error: %v", err)
 		os.Remove(newFname)
+		return false
 	}
+	return true
 }
 
 func (g *Glue) CFdHandle(path string) assets.FileManager {

@@ -19,20 +19,6 @@ void * cRefsPtr() {
 	return NULL;
 } 
 
-
-// derived from gomobile
-jint JNI_OnLoad(JavaVM* vm, void* reserved) {
-    JNIEnv* env;
-    if ((*vm)->GetEnv(vm, (void**)&env, JNI_VERSION_1_6) != JNI_OK) {
-        return -1;
-    }
-
-    // Get jclass with env->FindClass.
-    // Register methods with env->RegisterNatives.
-
-    return JNI_VERSION_1_6;
-}
-
 // Entry point for app
 // called when java.NativeActivity.onCreate is called
 // register callback functions here
@@ -62,26 +48,6 @@ void ANativeActivity_onCreate(ANativeActivity* activity, void* savedState, size_
 	callMain(activity, savedState, savedStateSize, mainPC);
 }
 
-static jclass findClass(JNIEnv *env, const char *class_name) {
-    jclass clazz = (*env)->FindClass(env, class_name);
-    if (clazz == NULL) {
-        (*env)->ExceptionClear(env);
-        LOG_ERROR("cannot find %s", class_name);
-        return NULL;
-    }
-    return clazz;
-}
-
-static jmethodID findMethod(JNIEnv *env, jclass clazz, const char *name, const char *sig) {
-    jmethodID m = (*env)->GetMethodID(env, clazz, name, sig);
-    if (m == 0) {
-        (*env)->ExceptionClear(env);
-        LOG_ERROR("cannot find method %s %s", name, sig);
-        return 0;
-    }
-    return m;
-}
-
 float getRefreshRate(ANativeActivity* activity) {
 	JNIEnv* env;
 	JavaVM* vm = activity->vm;
@@ -104,6 +70,31 @@ float getRefreshRate(ANativeActivity* activity) {
 	
 	(*vm)->DetachCurrentThread(vm);
 	return refreshRate;
+}
+
+// caller must free return value 
+char *getPackageName(ANativeActivity* activity) {
+	JNIEnv* env;
+	JavaVM* vm = activity->vm;
+	
+	(*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6);
+	(*vm)->AttachCurrentThread(vm, &env, NULL);
+
+	jclass  activityClass = (*env)->GetObjectClass(env, activity->clazz);
+	jmethodID getPkgName = (*env)->GetMethodID(env, activityClass, "getPackageName", "()Ljava/lang/String;");
+	jstring jAppName = (jstring)(*env)->CallObjectMethod(env, activity->clazz, getPkgName);
+	const char* str = (*env)->GetStringUTFChars(env, jAppName, NULL);
+	char * cstr = strdup(str);
+	
+	(*env)->ReleaseStringUTFChars(env, jAppName, str);
+	(*vm)->DetachCurrentThread(vm);
+	return cstr;
+
+}
+
+char *getNextEnv(int i) {
+	// environ is defined in unistd.h
+	return *(environ+i);
 }
 
 
