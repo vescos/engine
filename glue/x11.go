@@ -16,6 +16,7 @@ import (
 	"strings"
 	"unsafe"
 	"path/filepath"
+	"bufio"
 
 	"graphs/engine/assets"
 	"graphs/engine/glue/internal/assets/cfd"
@@ -44,35 +45,54 @@ func (g *Glue) InitPlatform(s State) {
 
 	g.cRefs.xDisplay = C.XOpenDisplay(nil)
 	if g.cRefs.xDisplay == nil {
-		log.Print("XOpenDisplay failed")
+		log.Print("InitPlatform: XOpenDisplay failed")
 		g.AppExit(s)
 	}
 
 	// Parse flags of type -flag=string
 	g.Config = make(map[string]string)
-	
-	file, err := os.Open(g.LinuxConfigFile)
-	if err != nil {
-		if g.LinuxConfigFile != "" {
-			log.Printf("Can't open config file: %v, error: %v", g.LinuxConfigFile, err)
-		}
-	} else {
-		defer file.Close()
-		
-	}
 	for _, v := range os.Args[1:] {
 		sp := strings.SplitN(v, "=", 2)
 		if len(sp) < 2 {
-			log.Printf("Can't parse flag: %v. Use -flag=string", v)
+			log.Printf("InitPlatform: Can't parse flag: %v. Use -flag=string", v)
 			continue
 		}
 		// remove leading -
 		if sp[0][0] != []byte("-")[0] {
-			log.Printf("Missing '-' in flag definition: %v. Use -flag=string", v)
+			log.Printf("InitPlatform: Missing '-' in flag definition: %v. Use -flag=string, ignoring", v)
 			continue
 		}
 		key := sp[0][1:]
 		g.Config[key] = sp[1]
+	}
+	// Read config 
+	fname := filepath.Clean(os.ExpandEnv(g.LinuxConfigFile))
+	// Overwrite LinuxConfigFile if available in comand line params
+	if fn, ok := g.Config["LinuxConfigFile"]; ok {
+		fname = filepath.Clean(os.ExpandEnv(fn))
+	}
+	file, err := os.Open(fname)
+	if err != nil {
+		if g.LinuxConfigFile != "" {
+			log.Printf("InitPlatform: Can't open config file: %v, error: %v", g.LinuxConfigFile, err)
+		}
+	} else {
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		scanner.Split(bufio.ScanLines)
+		for scanner.Scan() {
+			t := scanner.Text()
+			sp :=strings.SplitN(t, "=", 2)
+			if len(sp) < 2 {
+				log.Print("InitPlatform: Bad Config key: %v", sp)
+				continue
+			}
+			key, val := sp[0], sp[1]
+			// cmd params have priority, add key only if not exists
+			if _, ok := g.Config[key]; !ok {
+				g.Config[key] = val
+			}
+		}
 	}
 }
 
@@ -133,17 +153,34 @@ func (g *Glue) SaveConfig(cfg map[string]string) {
 		return
 	}
 	newSuffix := "_newcfg"
-	fname := filepath.Clean(os.ExpandEnv(g.LinuxConfigFile + newSuffix))
+	fname := filepath.Clean(os.ExpandEnv(g.LinuxConfigFile))
 	fdir := filepath.Dir(fname) 
 	os.MkdirAll(fdir, 0777)
-	file, err := os.OpenFile(fname, os.O_WRONLY | os.O_CREATE | os.O_EXCL, 0666)
+	newFname := fname + newSuffix
+	newFile, err := os.OpenFile(newFname, os.O_WRONLY | os.O_CREATE | os.O_EXCL | os.O_APPEND, 0644)
 	if err != nil {
-		log.Printf("SaveConfig: can't create file: %v", fname)
+		log.Printf("SaveConfig: can't create file: %v", newFname)
 		return
 	}
-	defer file.Close()
-	for k, v := range g.Config {
-		log.Print(k, v)
+	for k, v := range cfg {
+		// check for equal sign(=) into key
+		if strings.Contains(k, "=") {
+			log.Printf("SaveConfig: equal sign(=) is not allowed in config map keys, key: %v, ignoring", k)
+			continue
+		}
+		_, err = newFile.WriteString(k + "=" + v + "\n")
+		if err != nil {
+			log.Print("SaveConfig: can't save config file")
+			newFile.Close()
+			os.Remove(newFname)
+			return
+		}
+	}
+	newFile.Close()
+	err = os.Rename(newFname, fname) 
+	if err != nil {
+		log.Printf("SaveConfig: can't rename newconf to oldconf, error: %v", err)
+		os.Remove(newFname)
 	}
 }
 
