@@ -106,11 +106,30 @@ func (g *Glue) InitPlatform(s State) {
 		log.Printf(">>>>> ARM abi: %v", goarm)
 	}
 	
+	g.Config = make(map[string]string)
 	cPkgName := C.getPackageName(g.cRefs.aActivity)
 	defer C.free(unsafe.Pointer(cPkgName))
 	pkgName := C.GoString(cPkgName)
+	rml := len(pkgName) + 1
 	
-	log.Print(pkgName)
+	cExtras := C.getIntentExtras(g.cRefs.aActivity)
+	defer C.free(unsafe.Pointer(cExtras))
+	if cExtras != nil {
+		extras := C.GoString(cExtras)
+		opts := strings.Split(extras, "\n")
+		for _, val := range opts {
+			kv := strings.SplitN(val, "=", 2)
+			// remove leading pkgname.
+			if len(kv) != 2 {
+				log.Printf("InitPlatform: parseIntent: can't parse element: %v, skipping", val)
+				continue
+			}
+			if len(kv[0]) <= rml || !strings.Contains(kv[0][:rml], pkgName + ".") {
+				log.Printf("InitPlatform: parseIntent: key don't start with pkgName(dot): %v, skipping", val)
+			}
+			g.Config[kv[0][rml:]] = kv[1]
+		}
+	}
 	// TODO: read sharedPreferences and set Flags
 }
 

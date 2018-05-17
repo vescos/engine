@@ -72,7 +72,7 @@ float getRefreshRate(ANativeActivity* activity) {
 	return refreshRate;
 }
 
-// caller must free return value 
+// caller must free return 
 char *getPackageName(ANativeActivity* activity) {
 	JNIEnv* env;
 	JavaVM* vm = activity->vm;
@@ -89,7 +89,69 @@ char *getPackageName(ANativeActivity* activity) {
 	(*env)->ReleaseStringUTFChars(env, jAppName, str);
 	(*vm)->DetachCurrentThread(vm);
 	return cstr;
+}
 
+// caller must free return 
+char *getIntentExtras(ANativeActivity* activity) {
+	JNIEnv* env;
+	JavaVM* vm = activity->vm;
+	
+	(*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6);
+	(*vm)->AttachCurrentThread(vm, &env, NULL);
+	
+	jclass  activityClass = (*env)->GetObjectClass(env, activity->clazz);
+	jmethodID getIntent = (*env)->GetMethodID(env, activityClass, "getIntent", "()Landroid/content/Intent;");
+	
+	jobject intent = (jobject)(*env)->CallObjectMethod(env, activity->clazz, getIntent);
+	jclass intentClass = (*env)->FindClass(env, "android/content/Intent");
+	jmethodID getExtras = (*env)->GetMethodID(env, intentClass, "getExtras", "()Landroid/os/Bundle;");
+	
+	jobject bundle = (jobject)(*env)->CallObjectMethod(env, intent, getExtras);
+	if (bundle == NULL) {
+		return NULL;
+	}
+	jclass bundleClass = (*env)->FindClass(env, "android/os/Bundle");
+	jmethodID keySet = (*env)->GetMethodID(env, bundleClass, "keySet", "()Ljava/util/Set;");
+	
+	jobject set = (jobject)(*env)->CallObjectMethod(env, bundle, keySet);
+	jclass setClass = (*env)->FindClass(env, "java/util/Set");
+	jmethodID iteratorM = (*env)->GetMethodID(env, setClass, "iterator", "()Ljava/util/Iterator;");
+
+	jobject iterator = (jobject)(*env)->CallObjectMethod(env, set, iteratorM);
+	jclass iteratorClass = (*env)->FindClass(env, "java/util/Iterator");
+ 	jmethodID hasNext = (*env)->GetMethodID(env, iteratorClass, "hasNext", "()Z");
+	jmethodID next = (*env)->GetMethodID(env, iteratorClass, "next", "()Ljava/lang/Object;");
+	jmethodID bundleGet = (*env)->GetMethodID(env, bundleClass, "get", "(Ljava/lang/String;)Ljava/lang/Object;");
+	
+	char * cstr = strdup("\0");
+	jboolean has;
+	while (has = (*env)->CallBooleanMethod(env, iterator, hasNext)) {
+		jstring strObj = (jstring)(*env)->CallObjectMethod(env, iterator, next);
+		jobject val = (jobject)(*env)->CallObjectMethod(env, bundle, bundleGet, strObj);
+		jclass  unknownClass = (*env)->GetObjectClass(env, val);
+		jmethodID toStr = (*env)->GetMethodID(env, unknownClass, "toString", "()Ljava/lang/String;");
+		jstring valStrObj = (jstring)(*env)->CallObjectMethod(env, val, toStr);
+		
+		const char* key = (*env)->GetStringUTFChars(env, strObj, NULL);
+		const char* valStr = (*env)->GetStringUTFChars(env, valStrObj, NULL);
+		
+		// this will fail if there is = or \n in key and \n in valStr  
+		int len = strlen(cstr) + strlen(key) + strlen(valStr) + 2;
+		cstr = (char *) realloc(cstr, sizeof(char) * len);
+		if (strlen(cstr)) {
+			strcat(cstr, "\n");
+		}
+		strcat(cstr, key);
+		strcat(cstr, "=");
+		strcat(cstr, valStr);
+		
+		(*env)->ReleaseStringUTFChars(env, valStrObj, valStr);
+		(*env)->ReleaseStringUTFChars(env, strObj, key);
+	}
+	
+	
+	(*vm)->DetachCurrentThread(vm);
+	return cstr;
 }
 
 char *getNextEnv(int i) {

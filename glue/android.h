@@ -33,5 +33,6 @@ int createGLContext(cRefs *p);
 int bindGLContext(cRefs *p, int w, int h);
 float getRefreshRate(ANativeActivity* activity);
 char * getPackageName(ANativeActivity* activity);
+char * getIntentExtras(ANativeActivity* activity);
 char * getNextEnv(int i);
 
