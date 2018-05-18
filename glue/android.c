@@ -108,6 +108,7 @@ char *getIntentExtras(ANativeActivity* activity) {
 	
 	jobject bundle = (jobject)(*env)->CallObjectMethod(env, intent, getExtras);
 	if (bundle == NULL) {
+		(*vm)->DetachCurrentThread(vm);
 		return NULL;
 	}
 	jclass bundleClass = (*env)->FindClass(env, "android/os/Bundle");
@@ -123,7 +124,8 @@ char *getIntentExtras(ANativeActivity* activity) {
 	jmethodID next = (*env)->GetMethodID(env, iteratorClass, "next", "()Ljava/lang/Object;");
 	jmethodID bundleGet = (*env)->GetMethodID(env, bundleClass, "get", "(Ljava/lang/String;)Ljava/lang/Object;");
 	
-	char * cstr = strdup("\0");
+	char * cstr = (char *) malloc(10);
+	cstr[0] = '\0'; 
 	jboolean has;
 	while (has = (*env)->CallBooleanMethod(env, iterator, hasNext)) {
 		jstring strObj = (jstring)(*env)->CallObjectMethod(env, iterator, next);
@@ -135,8 +137,15 @@ char *getIntentExtras(ANativeActivity* activity) {
 		const char* key = (*env)->GetStringUTFChars(env, strObj, NULL);
 		const char* valStr = (*env)->GetStringUTFChars(env, valStrObj, NULL);
 		
-		// this will fail if there is = or \n in key and \n in valStr  
-		int len = strlen(cstr) + strlen(key) + strlen(valStr) + 2;
+		if (strchr(key, '\n') != NULL || strchr(key, '=') != NULL) {
+			LOG_INFO("Intent key contains newline or equal sign: %s, skipping", key);
+			continue;
+		}
+		if (strchr(valStr, '\n') != NULL) {
+			LOG_INFO("Intent value contains newline: %s, skipping", valStr);
+			continue;
+		}
+		int len = strlen(cstr) + strlen(key) + strlen(valStr) + 3;
 		cstr = (char *) realloc(cstr, sizeof(char) * len);
 		if (strlen(cstr)) {
 			strcat(cstr, "\n");
@@ -149,16 +158,90 @@ char *getIntentExtras(ANativeActivity* activity) {
 		(*env)->ReleaseStringUTFChars(env, strObj, key);
 	}
 	
-	
 	(*vm)->DetachCurrentThread(vm);
+	if (strlen(cstr) == 0) {
+		free(cstr);
+		return NULL;
+	}
 	return cstr;
 }
 
+// caller must free return
+char *getSharedPrefs(ANativeActivity* activity, char * prefsName) {
+	JNIEnv* env;
+	JavaVM* vm = activity->vm;
+	
+	(*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6);
+	(*vm)->AttachCurrentThread(vm, &env, NULL);
+	
+	jclass  activityClass = (*env)->GetObjectClass(env, activity->clazz);
+	jmethodID prefsM = (*env)->GetMethodID(env, activityClass, 
+				"getSharedPreferences", "(Ljava/lang/Object;I)Landroid/content/SharedPreferences;");
+	jstring jPrefsName = (*env)->NewStringUTF(env, prefsName);
+	// 0 - MODE_PRIVATE
+	jobject prefsObj = (jobject)(*env)->CallObjectMethod(env, activity->clazz, prefsM, jPrefsName, 0);
+	jclass prefsClass = (*env)->FindClass(env, "android/content/SharedPreferences");
+	jmethodID getAllM = (*env)->GetMethodID(env, prefsClass, "getAll", "()Ljava/util/Map;");
+
+	jobject mapObj = (jobject)(*env)->CallObjectMethod(env, prefsObj, getAllM);
+	jclass mapClass = (*env)->FindClass(env, "java/util/Map");
+	jmethodID keySetM = (*env)->GetMethodID(env, mapClass, "keySet", "()Ljava/util/Set;");
+	
+	jobject setObj = (jobject)(*env)->CallObjectMethod(env, mapObj, keySetM);
+	jclass setClass = (*env)->FindClass(env, "java/util/Set");
+	jmethodID iteratorM = (*env)->GetMethodID(env, setClass, "iterator", "()Ljava/util/Iterator;");
+
+	jobject iterator = (jobject)(*env)->CallObjectMethod(env, setObj, iteratorM);
+	jclass iteratorClass = (*env)->FindClass(env, "java/util/Iterator");
+ 	jmethodID hasNext = (*env)->GetMethodID(env, iteratorClass, "hasNext", "()Z");
+	jmethodID next = (*env)->GetMethodID(env, iteratorClass, "next", "()Ljava/lang/Object;");
+	jmethodID mapGet = (*env)->GetMethodID(env, mapClass, "get", "(Ljava/lang/String;)Ljava/lang/Object;");
+	
+	char * cstr = (char *) malloc(10);
+	cstr[0] = '\0';
+	jboolean has;
+	while (has = (*env)->CallBooleanMethod(env, iterator, hasNext)) {
+		jstring strObj = (jstring)(*env)->CallObjectMethod(env, iterator, next);
+		jobject val = (jobject)(*env)->CallObjectMethod(env, mapObj, mapGet, strObj);
+		jclass  unknownClass = (*env)->GetObjectClass(env, val);
+		jmethodID toStr = (*env)->GetMethodID(env, unknownClass, "toString", "()Ljava/lang/String;");
+		jstring valStrObj = (jstring)(*env)->CallObjectMethod(env, val, toStr);
+		
+		const char* key = (*env)->GetStringUTFChars(env, strObj, NULL);
+		const char* valStr = (*env)->GetStringUTFChars(env, valStrObj, NULL);
+		
+		if (strchr(key, '\n') != NULL || strchr(key, '=') != NULL) {
+			LOG_INFO("Intent key contains newline or equal sign: %s, skipping", key);
+			continue;
+		}
+		if (strchr(valStr, '\n') != NULL) {
+			LOG_INFO("Intent value contains newline: %s, skipping", valStr);
+			continue;
+		}
+		int len = strlen(cstr) + strlen(key) + strlen(valStr) + 3;
+		cstr = (char *) realloc(cstr, sizeof(char) * len);
+		if (strlen(cstr)) {
+			strcat(cstr, "\n");
+		}
+		strcat(cstr, key);
+		strcat(cstr, "=");
+		strcat(cstr, valStr);
+		
+		(*env)->ReleaseStringUTFChars(env, valStrObj, valStr);
+		(*env)->ReleaseStringUTFChars(env, strObj, key);
+	}
+	
+	(*vm)->DetachCurrentThread(vm);
+	if (strlen(cstr) == 0) {
+		free(cstr);
+		return NULL;
+	}
+	return cstr;
+}
 char *getNextEnv(int i) {
 	// environ is defined in unistd.h
 	return *(environ+i);
 }
-
 
 // EGL
 // main egl config

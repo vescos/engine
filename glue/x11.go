@@ -9,14 +9,14 @@ package glue
 */
 import "C"
 import (
+	"bufio"
 	"log"
 	"os"
-	"runtime"
-	"time"
-	"strings"
-	"unsafe"
 	"path/filepath"
-	"bufio"
+	"runtime"
+	"strings"
+	"time"
+	"unsafe"
 
 	"graphs/engine/assets"
 	"graphs/engine/glue/internal/assets/cfd"
@@ -30,7 +30,7 @@ type platform struct {
 	cRefs        *C.cRefs
 	windowWidth  int
 	windowHeight int
-	exitMain bool
+	exitMain     bool
 }
 
 func init() {
@@ -65,7 +65,7 @@ func (g *Glue) InitPlatform(s State) {
 		key := sp[0][1:]
 		g.Config[key] = sp[1]
 	}
-	// Read config 
+	// Read config
 	fname := filepath.Clean(os.ExpandEnv(g.LinuxConfigFile))
 	// Overwrite LinuxConfigFile if available in comand line params
 	if fn, ok := g.Config["LinuxConfigFile"]; ok {
@@ -82,7 +82,7 @@ func (g *Glue) InitPlatform(s State) {
 		scanner.Split(bufio.ScanLines)
 		for scanner.Scan() {
 			t := scanner.Text()
-			sp :=strings.SplitN(t, "=", 2)
+			sp := strings.SplitN(t, "=", 2)
 			if len(sp) != 2 {
 				log.Print("InitPlatform: Bad Config key: %v", sp)
 				continue
@@ -125,9 +125,9 @@ func (g *Glue) StartMainLoop(s State) {
 			s.StopDrawing()
 			s.Pause()
 			s.Destroy()
-			
+
 			// Block and give time to other goroutines to exit.
-			time.Sleep(time.Millisecond*50)
+			time.Sleep(time.Millisecond * 50)
 			//time.AfterFunc(time.Millisecond*50, func() { os.Exit(0) })
 			C.free(unsafe.Pointer(g.cRefs))
 			// Return to main.main or caller.
@@ -154,10 +154,10 @@ func (g *Glue) SaveConfig(cfg map[string]string) bool {
 	}
 	newSuffix := "_newcfg"
 	fname := filepath.Clean(os.ExpandEnv(g.LinuxConfigFile))
-	fdir := filepath.Dir(fname) 
+	fdir := filepath.Dir(fname)
 	os.MkdirAll(fdir, 0777)
 	newFname := fname + newSuffix
-	newFile, err := os.OpenFile(newFname, os.O_WRONLY | os.O_CREATE | os.O_EXCL | os.O_APPEND, 0644)
+	newFile, err := os.OpenFile(newFname, os.O_WRONLY|os.O_CREATE|os.O_EXCL|os.O_APPEND, 0644)
 	if err != nil {
 		log.Printf("SaveConfig: can't create file: %v", newFname)
 		return false
@@ -182,7 +182,7 @@ func (g *Glue) SaveConfig(cfg map[string]string) bool {
 		}
 	}
 	newFile.Close()
-	err = os.Rename(newFname, fname) 
+	err = os.Rename(newFname, fname)
 	if err != nil {
 		log.Printf("SaveConfig: can't rename newconf to oldconf, error: %v", err)
 		os.Remove(newFname)

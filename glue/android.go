@@ -17,10 +17,10 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 	"unsafe"
-	"strings"
 
 	"graphs/engine/assets"
 	"graphs/engine/glue/internal/assets/cfd"
@@ -105,13 +105,13 @@ func (g *Glue) InitPlatform(s State) {
 	if runtime.GOARCH == "arm" {
 		log.Printf(">>>>> ARM abi: %v", goarm)
 	}
-	
+
 	g.Config = make(map[string]string)
 	cPkgName := C.getPackageName(g.cRefs.aActivity)
 	defer C.free(unsafe.Pointer(cPkgName))
 	pkgName := C.GoString(cPkgName)
 	rml := len(pkgName) + 1
-	
+
 	cExtras := C.getIntentExtras(g.cRefs.aActivity)
 	defer C.free(unsafe.Pointer(cExtras))
 	if cExtras != nil {
@@ -124,13 +124,28 @@ func (g *Glue) InitPlatform(s State) {
 				log.Printf("InitPlatform: parseIntent: can't parse element: %v, skipping", val)
 				continue
 			}
-			if len(kv[0]) <= rml || !strings.Contains(kv[0][:rml], pkgName + ".") {
+			if len(kv[0]) <= rml || !strings.Contains(kv[0][:rml], pkgName+".") {
 				log.Printf("InitPlatform: parseIntent: key don't start with pkgName(dot): %v, skipping", val)
+				continue
 			}
 			g.Config[kv[0][rml:]] = kv[1]
 		}
 	}
-	// TODO: read sharedPreferences and set Flags
+
+	// Read config from sharedPreferences
+	// Not too much useful envvars in android but let expandEnv
+	prefs := os.ExpandEnv(g.LinuxConfigFile)
+	// Overwrite LinuxConfigFile if available in comand line params
+	if fn, ok := g.Config["AndroidConfigFile"]; ok {
+		prefs = os.ExpandEnv(fn)
+	}
+	cprefs := C.CString(prefs)
+	defer C.free(unsafe.Pointer(cprefs))
+	cfg := C.getSharedPrefs(g.cRefs.aActivity, cprefs)
+	defer C.free(unsafe.Pointer(cfg))
+	if cfg != nil {
+		// TODO:
+	}
 }
 
 func (g *Glue) StartMainLoop(s State) {

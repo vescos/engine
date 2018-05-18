@@ -34,5 +34,6 @@ int bindGLContext(cRefs *p, int w, int h);
 float getRefreshRate(ANativeActivity* activity);
 char * getPackageName(ANativeActivity* activity);
 char * getIntentExtras(ANativeActivity* activity);
+char * getSharedPrefs(ANativeActivity* activity, char * prefsName);
 char * getNextEnv(int i);
 
