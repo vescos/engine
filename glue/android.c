@@ -176,7 +176,7 @@ char *getSharedPrefs(ANativeActivity* activity, char * prefsName) {
 	
 	jclass  activityClass = (*env)->GetObjectClass(env, activity->clazz);
 	jmethodID prefsM = (*env)->GetMethodID(env, activityClass, 
-				"getSharedPreferences", "(Ljava/lang/Object;I)Landroid/content/SharedPreferences;");
+				"getSharedPreferences", "(Ljava/lang/String;I)Landroid/content/SharedPreferences;");
 	jstring jPrefsName = (*env)->NewStringUTF(env, prefsName);
 	// 0 - MODE_PRIVATE
 	jobject prefsObj = (jobject)(*env)->CallObjectMethod(env, activity->clazz, prefsM, jPrefsName, 0);
@@ -195,7 +195,7 @@ char *getSharedPrefs(ANativeActivity* activity, char * prefsName) {
 	jclass iteratorClass = (*env)->FindClass(env, "java/util/Iterator");
  	jmethodID hasNext = (*env)->GetMethodID(env, iteratorClass, "hasNext", "()Z");
 	jmethodID next = (*env)->GetMethodID(env, iteratorClass, "next", "()Ljava/lang/Object;");
-	jmethodID mapGet = (*env)->GetMethodID(env, mapClass, "get", "(Ljava/lang/String;)Ljava/lang/Object;");
+	jmethodID mapGet = (*env)->GetMethodID(env, mapClass, "get", "(Ljava/lang/Object;)Ljava/lang/Object;");
 	
 	char * cstr = (char *) malloc(10);
 	cstr[0] = '\0';
@@ -230,7 +230,6 @@ char *getSharedPrefs(ANativeActivity* activity, char * prefsName) {
 		(*env)->ReleaseStringUTFChars(env, valStrObj, valStr);
 		(*env)->ReleaseStringUTFChars(env, strObj, key);
 	}
-	
 	(*vm)->DetachCurrentThread(vm);
 	if (strlen(cstr) == 0) {
 		free(cstr);

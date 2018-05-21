@@ -119,11 +119,11 @@ func (g *Glue) InitPlatform(s State) {
 		opts := strings.Split(extras, "\n")
 		for _, val := range opts {
 			kv := strings.SplitN(val, "=", 2)
-			// remove leading pkgname.
 			if len(kv) != 2 {
 				log.Printf("InitPlatform: parseIntent: can't parse element: %v, skipping", val)
 				continue
 			}
+			// remove leading pkgname.
 			if len(kv[0]) <= rml || !strings.Contains(kv[0][:rml], pkgName+".") {
 				log.Printf("InitPlatform: parseIntent: key don't start with pkgName(dot): %v, skipping", val)
 				continue
@@ -134,17 +134,29 @@ func (g *Glue) InitPlatform(s State) {
 
 	// Read config from sharedPreferences
 	// Not too much useful envvars in android but let expandEnv
-	prefs := os.ExpandEnv(g.LinuxConfigFile)
-	// Overwrite LinuxConfigFile if available in comand line params
+	prefs := os.ExpandEnv(g.AndroidConfigFile)
+	// Overwrite AndroidConfigFile if available in Intent extras line params
 	if fn, ok := g.Config["AndroidConfigFile"]; ok {
 		prefs = os.ExpandEnv(fn)
 	}
 	cprefs := C.CString(prefs)
 	defer C.free(unsafe.Pointer(cprefs))
-	cfg := C.getSharedPrefs(g.cRefs.aActivity, cprefs)
-	defer C.free(unsafe.Pointer(cfg))
-	if cfg != nil {
-		// TODO:
+	cCfg := C.getSharedPrefs(g.cRefs.aActivity, cprefs)
+	defer C.free(unsafe.Pointer(cCfg))
+	if cCfg != nil {
+		cfg := C.GoString(cCfg)
+		opts := strings.Split(cfg, "\n")
+		for _, val := range opts {
+			kv := strings.SplitN(val, "=", 2)
+			if len(kv) != 2 {
+				log.Printf("InitPlatform: parseSharedConf: can't parse element: %v, skipping", val)
+				continue
+			}
+			// intent params have priority
+			if _, ok := g.Config[kv[0]]; !ok {
+				g.Config[kv[0]] = kv[1]
+			}
+		}
 	}
 }
 
