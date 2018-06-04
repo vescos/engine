@@ -44,8 +44,9 @@ void ANativeActivity_onCreate(ANativeActivity* activity, void* savedState, size_
 	uintptr_t mainPC = (uintptr_t)dlsym(RTLD_DEFAULT, "main.main");
 	if (!mainPC) {
 		LOG_ERROR("missing main.main");
+	} else {
+		callMain(activity, savedState, savedStateSize, mainPC);
 	}
-	callMain(activity, savedState, savedStateSize, mainPC);
 }
 
 float getRefreshRate(ANativeActivity* activity) {
@@ -237,6 +238,59 @@ char *getSharedPrefs(ANativeActivity* activity, char * prefsName) {
 	}
 	return cstr;
 }
+
+// return 1 on succes 0 on failure
+void saveSharedPrefs(ANativeActivity* activity, char * prefsName, char * prefs) {
+	JNIEnv* env;
+	JavaVM* vm = activity->vm;
+	
+	(*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6);
+	(*vm)->AttachCurrentThread(vm, &env, NULL);
+	
+	jclass  activityClass = (*env)->GetObjectClass(env, activity->clazz);
+	jmethodID prefsM = (*env)->GetMethodID(env, activityClass, 
+			"getSharedPreferences", "(Ljava/lang/String;I)Landroid/content/SharedPreferences;");
+	jstring jPrefsName = (*env)->NewStringUTF(env, prefsName);
+	// 0 - MODE_PRIVATE
+	jobject prefsObj = (jobject)(*env)->CallObjectMethod(env, activity->clazz, prefsM, jPrefsName, 0);
+	jclass prefsClass = (*env)->FindClass(env, "android/content/SharedPreferences");
+	jmethodID editorM = (*env)->GetMethodID(env, prefsClass, "edit", "()Landroid/content/SharedPreferences$Editor;");
+	
+	jobject editorObj = (jobject)(*env)->CallObjectMethod(env, prefsObj, editorM);
+	jclass editorClass = (*env)->GetObjectClass(env, editorObj);
+	jmethodID putStringM = (*env)->GetMethodID(env, editorClass, 
+			"putString", "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;");
+	// expected string format is 
+	// key=val\n....key=val\n\0
+	char *key, *val, *end;
+	key = prefs;
+	while (end = strstr(key, "\n")) {
+		val = strstr(key, "=");
+		char * k = strndup(key, val - key);
+		val++;
+		// if val is empty string end - val will be 0?
+		char * v = strndup(val, end - val);
+		jstring jk = (*env)->NewStringUTF(env, k);
+		jstring jv = (*env)->NewStringUTF(env, v);
+		
+		(*env)->CallObjectMethod(env, editorObj, putStringM, jk, jv);
+		
+		(*env)->DeleteLocalRef(env, jk);
+		(*env)->DeleteLocalRef(env, jv);
+		free(v);
+		free(k);
+		key = end + 1;
+		if (key == '\0') {
+			break;
+		}
+	} 
+	
+	jmethodID applyM = (*env)->GetMethodID(env, editorClass, "apply", "()V");
+	(*env)->CallObjectMethod(env, editorObj, applyM);
+	
+	(*vm)->DetachCurrentThread(vm);
+}
+
 char *getNextEnv(int i) {
 	// environ is defined in unistd.h
 	return *(environ+i);

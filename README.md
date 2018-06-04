@@ -20,6 +20,13 @@ Standard Golang library.
 ### Usage
 
 ```go
+import (
+	"graphs/engine/glue"
+	"graphs/engine/input/keys"
+	"graphs/engine/input/size"
+	"graphs/engine/input/touch"
+)
+
 type State struct {
 	*glue.Glue
 	// App flags and props

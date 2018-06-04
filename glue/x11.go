@@ -67,7 +67,7 @@ func (g *Glue) InitPlatform(s State) {
 	}
 	// Read config
 	fname := filepath.Clean(os.ExpandEnv(g.LinuxConfigFile))
-	// Overwrite LinuxConfigFile if available in comand line params
+	// Overwrite LinuxConfigFile if available in command line params
 	if fn, ok := g.Config["LinuxConfigFile"]; ok {
 		fname = filepath.Clean(os.ExpandEnv(fn))
 	}
@@ -147,13 +147,19 @@ func (g *Glue) AppExit(s State) {
 	g.exitMain = true
 }
 
+// All keys that don't present in cfg will be deleted from config
+// TODO: above is not ok.
 func (g *Glue) SaveConfig(cfg map[string]string) bool {
-	if g.LinuxConfigFile == "" {
-		log.Print("SaveConfig: empty string LinuxConfigFile")
+	fname := filepath.Clean(os.ExpandEnv(g.LinuxConfigFile))
+	// Overwrite LinuxConfigFile if available in command line params
+	if fn, ok := g.Config["LinuxConfigFile"]; ok {
+		fname = filepath.Clean(os.ExpandEnv(fn))
+	}
+	if fname == "" {
+		log.Printf("SaveConfig: empty string LinuxConfigFile, skipping, fname:", fname)
 		return false
 	}
 	newSuffix := "_newcfg"
-	fname := filepath.Clean(os.ExpandEnv(g.LinuxConfigFile))
 	fdir := filepath.Dir(fname)
 	os.MkdirAll(fdir, 0777)
 	newFname := fname + newSuffix
@@ -170,7 +176,7 @@ func (g *Glue) SaveConfig(cfg map[string]string) bool {
 		}
 		// check for \n in value
 		if strings.Contains(v, "\n") {
-			log.Printf("SaveConfig: equal newline is not allowed in config map vals, val: %v, ignoring", v)
+			log.Printf("SaveConfig: newline is not allowed in config map vals, val: %v, ignoring", v)
 			continue
 		}
 		_, err = newFile.WriteString(k + "=" + v + "\n")

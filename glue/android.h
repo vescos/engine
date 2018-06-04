@@ -35,5 +35,6 @@ float getRefreshRate(ANativeActivity* activity);
 char * getPackageName(ANativeActivity* activity);
 char * getIntentExtras(ANativeActivity* activity);
 char * getSharedPrefs(ANativeActivity* activity, char * prefsName);
+void saveSharedPrefs(ANativeActivity* activity, char * prefsName, char * prefs);
 char * getNextEnv(int i);
 

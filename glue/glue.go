@@ -32,9 +32,12 @@ type Glue struct {
 	FbHeight       int
 	RefreshRate    float32
 	PlatformString string
+	///////////////////////
 	// platform specific
 	LinuxConfigFile   string
+	// eg. android shared preferences
 	AndroidConfigFile string
+	//////////////////////
 	// unexported fields
 	platform
 }

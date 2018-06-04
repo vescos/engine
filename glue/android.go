@@ -142,8 +142,8 @@ func (g *Glue) InitPlatform(s State) {
 	cprefs := C.CString(prefs)
 	defer C.free(unsafe.Pointer(cprefs))
 	cCfg := C.getSharedPrefs(g.cRefs.aActivity, cprefs)
-	defer C.free(unsafe.Pointer(cCfg))
 	if cCfg != nil {
+		defer C.free(unsafe.Pointer(cCfg))
 		cfg := C.GoString(cCfg)
 		opts := strings.Split(cfg, "\n")
 		for _, val := range opts {
@@ -157,6 +157,8 @@ func (g *Glue) InitPlatform(s State) {
 				g.Config[kv[0]] = kv[1]
 			}
 		}
+	} else {
+		log.Printf("InitPlatform: can't open shared prefs file: %v", prefs)
 	}
 }
 
@@ -236,7 +238,41 @@ func (g *Glue) AppExit(s State) {
 
 func (g *Glue) SaveConfig(cfg map[string]string) bool {
 	// TODO:
-	return false
+	prefsName := os.ExpandEnv(g.AndroidConfigFile)
+	// Overwrite AndroidConfigFile if available in Intent extras line params
+	if fn, ok := g.Config["AndroidConfigFile"]; ok {
+		prefsName = os.ExpandEnv(fn)
+	}
+	if prefsName == "" {
+		log.Print("SaveConfig: empty string AndroidConfigFile: skipping.")
+		return false
+	}
+	if len(cfg) == 0 {
+		return true
+	}
+	cprefsName := C.CString(prefsName)
+	defer C.free(unsafe.Pointer(cprefsName))
+	prefsStr := ""
+	for key, val := range cfg {
+		// check for equal sign(=) or \n into key
+		if strings.ContainsAny(key, "=\n") {
+			log.Printf("SaveConfig: equal sign(=) and newline is not allowed in config map keys, key: %v, ignoring", key)
+			continue
+		}
+		// check for \n in value
+		if strings.Contains(val, "\n") {
+			log.Printf("SaveConfig: newline is not allowed in config map vals, val: %v, ignoring", val)
+			continue
+		}
+		prefsStr += key + "=" + val + "\n"
+	}
+	if len(prefsStr) > 0 {
+		cPrefsStr := C.CString(prefsStr)
+		defer C.free(unsafe.Pointer(cPrefsStr))
+		C.saveSharedPrefs(g.cRefs.aActivity, cprefsName, cPrefsStr)
+	}
+	
+	return true
 }
 
 func (g *Glue) CFdHandle(path string) assets.FileManager {
@@ -568,6 +604,7 @@ func onInputQueueDestroyed(activity *C.ANativeActivity, queue *C.AInputQueue) {
 //export callMain
 func callMain(activity *C.ANativeActivity, savedState unsafe.Pointer, savedStateSize int, mainPC uintptr) {
 	// Set env vars - just a few vars are available on android
+	// TODO: try to implement getNextEnv with uintptr + i
 	n := C.getNextEnv(0)
 	for i := 1; n != nil; i += 1 {
 		split := strings.SplitN(C.GoString(n), "=", 2)
