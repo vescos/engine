@@ -7,14 +7,32 @@ package glue
 import "C"
 import (
 	"fmt"
+	"log"
+	"runtime"
+	"time"
 )
 
 const (
 	LogTag  string = "LabyrinthEngine"
 	LogSize int    = 1024
 	// max events to process on frame
-	maxEvents int = 50
+	maxEvents int    = 50
+	stMb      uint32 = 1024 * 1024
 )
+
+func (g *Glue) LogFps() {
+	t := time.Now()
+	if t.UnixNano()-g.fpsTime.UnixNano() >= 1000000000.0 {
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		log.Printf("fps: %v, Alloc: %vM, Sys: %vM",
+			g.fpsCount, uint32(m.Alloc)/stMb, uint32(m.Sys)/stMb)
+		g.fpsTime = t
+		g.fpsCount = 0
+	} else {
+		g.fpsCount += 1
+	}
+}
 
 /////////////////////////////////////////////////////////////////
 // eglError copy/paste from gomobile/app

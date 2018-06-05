@@ -118,6 +118,8 @@ func (g *Glue) StartMainLoop(s State) {
 		PixelsPerPt: 1.0,
 	}
 	s.Resume()
+	g.fpsTime = time.Now()
+	g.fpsCount = 0
 	s.StartDrawing()
 	s.Size(sz)
 	for {

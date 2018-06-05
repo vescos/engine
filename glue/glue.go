@@ -2,6 +2,7 @@ package glue
 
 import (
 	//"log"
+	"time"
 
 	"graphs/engine/input/keys"
 	"graphs/engine/input/size"
@@ -34,10 +35,12 @@ type Glue struct {
 	PlatformString string
 	///////////////////////
 	// platform specific
-	LinuxConfigFile   string
+	LinuxConfigFile string
 	// eg. android shared preferences
 	AndroidConfigFile string
 	//////////////////////
 	// unexported fields
 	platform
+	fpsTime  time.Time
+	fpsCount int
 }

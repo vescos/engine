@@ -201,6 +201,8 @@ func (g *Glue) StartMainLoop(s State) {
 			//YES
 			if !g.drawing {
 				g.drawing = true
+				g.fpsTime = time.Now()
+				g.fpsCnt = 0
 				s.StartDrawing()
 			}
 			if g.callSize {
@@ -271,7 +273,7 @@ func (g *Glue) SaveConfig(cfg map[string]string) bool {
 		defer C.free(unsafe.Pointer(cPrefsStr))
 		C.saveSharedPrefs(g.cRefs.aActivity, cprefsName, cPrefsStr)
 	}
-	
+
 	return true
 }
 

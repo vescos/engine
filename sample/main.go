@@ -27,14 +27,14 @@ func main() {
 	// set initial FB size in px
 	// on android FB size will be overriden by actual device screen size
 	var err error
-	if fbWidth, ok := s.Flags["fbWidth"]; ok {
+	if fbWidth, ok := s.Config["fbWidth"]; ok {
 		s.FbWidth, err = strconv.Atoi(fbWidth)
 		if err != nil {
 			log.Printf("Can't parse fbWidth, Err: %v, fbWidth: %v", err, fbWidth)
 			log.Print("FbWidth set to: 0")
 		}
 	}
-	if fbHeight, ok := s.Flags["fbHeight"]; ok {
+	if fbHeight, ok := s.Config["fbHeight"]; ok {
 		s.FbHeight, err = strconv.Atoi(fbHeight)
 		if err != nil {
 			log.Printf("Can't parse fbHeight, Err: %v, fbHeight: %v", err, fbHeight)
@@ -76,6 +76,7 @@ func (s *State) Resume() {}
 func (s *State) StartDrawing() {}
 
 func (s *State) Draw() {
+	s.LogFps()
 	gles2.ClearColor(0.0, 1.0, 0.0, 1.0)
 	gles2.ClearDepthf(1.0)
 	gles2.Clear(gles2.COLOR_BUFFER_BIT | gles2.DEPTH_BUFFER_BIT)
