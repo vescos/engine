@@ -159,15 +159,30 @@ func (g *Glue) SaveConfig(cfg map[string]string) bool {
 		log.Printf("SaveConfig: empty string LinuxConfigFile, skipping, fname:", fname)
 		return false
 	}
-	newSuffix := "_newcfg"
 	fdir := filepath.Dir(fname)
 	os.MkdirAll(fdir, 0777)
-	newFname := fname + newSuffix
-	newFile, err := os.OpenFile(newFname, os.O_WRONLY|os.O_CREATE|os.O_EXCL|os.O_APPEND, 0644)
+	file, err := os.OpenFile(fname, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0644)
+	oldCfg := make(map[string]string)
 	if err != nil {
-		log.Printf("SaveConfig: can't create file: %v", newFname)
+		log.Printf("SaveConfig: can't open file: %v, err: %v", fname, err)
 		return false
+	} else {
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		scanner.Split(bufio.ScanLines)
+		for scanner.Scan() {
+			t := scanner.Text()
+			sp := strings.SplitN(t, "=", 2)
+			if len(sp) != 2 {
+				log.Print("SaveConfig: Bad Config key: %v", sp)
+				continue
+			}
+			key, val := sp[0], sp[1]
+			oldCfg[key] = val
+		}
 	}
+	file.Truncate(0)
+	file.Seek(0, 0)
 	for k, v := range cfg {
 		// check for equal sign(=) or \n into key
 		if strings.ContainsAny(k, "=\n") {
@@ -179,20 +194,31 @@ func (g *Glue) SaveConfig(cfg map[string]string) bool {
 			log.Printf("SaveConfig: newline is not allowed in config map vals, val: %v, ignoring", v)
 			continue
 		}
-		_, err = newFile.WriteString(k + "=" + v + "\n")
+		_, err = file.WriteString(k + "=" + v + "\n")
 		if err != nil {
 			log.Print("SaveConfig: can't save config file")
-			newFile.Close()
-			os.Remove(newFname)
 			return false
 		}
 	}
-	newFile.Close()
-	err = os.Rename(newFname, fname)
-	if err != nil {
-		log.Printf("SaveConfig: can't rename newconf to oldconf, error: %v", err)
-		os.Remove(newFname)
-		return false
+	for k, v := range oldCfg {
+		// write old entries only if not present in cfg
+		if _, ok := cfg[k]; ok {
+			continue
+		}
+		if strings.ContainsAny(k, "=\n") {
+			log.Printf("SaveConfig: equal sign(=) and newline is not allowed in config map keys, key: %v, ignoring", k)
+			continue
+		}
+		// check for \n in value
+		if strings.Contains(v, "\n") {
+			log.Printf("SaveConfig: newline is not allowed in config map vals, val: %v, ignoring", v)
+			continue
+		}
+		_, err = file.WriteString(k + "=" + v + "\n")
+		if err != nil {
+			log.Print("SaveConfig: can't save config file")
+			return false
+		}
 	}
 	return true
 }

@@ -264,6 +264,8 @@ void saveSharedPrefs(ANativeActivity* activity, char * prefsName, char * prefs) 
 	// key=val\n....key=val\n\0
 	char *key, *val, *end;
 	key = prefs;
+	// There is no check that key with same name exist but with different type(eg. created from java side)!!!
+	// Behavior is undefined(crash) in this case.
 	while (end = strstr(key, "\n")) {
 		val = strstr(key, "=");
 		char * k = strndup(key, val - key);
