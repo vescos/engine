@@ -202,7 +202,7 @@ func (g *Glue) StartMainLoop(s State) {
 			if !g.drawing {
 				g.drawing = true
 				g.fpsTime = time.Now()
-				g.fpsCnt = 0
+				g.fpsCount = 0
 				s.StartDrawing()
 			}
 			if g.callSize {

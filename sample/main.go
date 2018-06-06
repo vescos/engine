@@ -4,7 +4,6 @@ import (
 	"log"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/vescos/engine/gles2"
 	"github.com/vescos/engine/glprog"
@@ -48,12 +47,10 @@ func main() {
 type State struct {
 	*glue.Glue
 	programs map[string]*glprog.Prog
-	fpsTime  time.Time
 	ETC1Ext  bool
 }
 
 func (s *State) InitState() {
-	s.fpsTime = time.Now()
 }
 
 func (s *State) Load() {}
