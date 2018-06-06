@@ -3,7 +3,7 @@ package glprog
 import (
 	"log"
 
-	"graphs/engine/gles2"
+	"github.com/vescos/engine/gles2"
 )
 
 //DONE: optimization: USE Interleaved Vertex Data

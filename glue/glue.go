@@ -4,9 +4,9 @@ import (
 	//"log"
 	"time"
 
-	"graphs/engine/input/keys"
-	"graphs/engine/input/size"
-	"graphs/engine/input/touch"
+	"github.com/vescos/engine/input/keys"
+	"github.com/vescos/engine/input/size"
+	"github.com/vescos/engine/input/touch"
 )
 
 type State interface {

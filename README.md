@@ -17,20 +17,12 @@ Ogg Vorbis decoder [stb_vorbis](http://nothings.org/stb_vorbis/) (Open Domain li
 ### Dependencies 
 Standard Golang library.
 
+### Install
+go get github.com/vescos/engine
+
 ### Usage
 
 ```go
-import (
-	"graphs/engine/glue"
-	"graphs/engine/input/keys"
-	"graphs/engine/input/size"
-	"graphs/engine/input/touch"
-)
-
-type State struct {
-	*glue.Glue
-	// App flags and props
-	// ...
-}
+// TODO:
 
 ```

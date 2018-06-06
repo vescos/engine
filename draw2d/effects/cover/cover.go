@@ -13,7 +13,7 @@ import (
 	//"log"
 	"time"
 
-	"graphs/engine/tobyte"
+	"github.com/vescos/engine/tobyte"
 )
 
 type State struct {

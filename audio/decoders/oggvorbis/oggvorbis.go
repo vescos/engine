@@ -15,8 +15,8 @@ import (
 	"log"
 	"unsafe"
 
-	"graphs/engine/assets"
-	//"graphs/tobyte"
+	"github.com/vescos/engine/assets"
+	//"github.com/vescos/tobyte"
 )
 
 type State struct{}

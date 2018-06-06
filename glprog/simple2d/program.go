@@ -1,8 +1,8 @@
 package simple2d
 
 import (
-	"graphs/engine/gles2"
-	"graphs/engine/glprog"
+	"github.com/vescos/engine/gles2"
+	"github.com/vescos/engine/glprog"
 )
 
 const vs = `

@@ -8,8 +8,8 @@ import (
 	"io"
 	"log"
 
-	"graphs/engine/assets"
-	"graphs/engine/tobyte"
+	"github.com/vescos/engine/assets"
+	"github.com/vescos/engine/tobyte"
 )
 
 type State struct{}

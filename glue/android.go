@@ -22,13 +22,13 @@ import (
 	"time"
 	"unsafe"
 
-	"graphs/engine/assets"
-	"graphs/engine/glue/internal/assets/cfd"
-	"graphs/engine/glue/internal/assets/gofd"
-	"graphs/engine/glue/internal/callfn"
-	"graphs/engine/input/keys"
-	"graphs/engine/input/size"
-	"graphs/engine/input/touch"
+	"github.com/vescos/engine/assets"
+	"github.com/vescos/engine/glue/internal/assets/cfd"
+	"github.com/vescos/engine/glue/internal/assets/gofd"
+	"github.com/vescos/engine/glue/internal/callfn"
+	"github.com/vescos/engine/input/keys"
+	"github.com/vescos/engine/input/size"
+	"github.com/vescos/engine/input/touch"
 )
 
 // Used to link android onCreate with mainLoop

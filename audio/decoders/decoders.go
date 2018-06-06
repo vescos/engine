@@ -2,7 +2,7 @@
 package decoders
 
 import (
-	"graphs/assets"
+	"github.com/vescos/assets"
 )
 
 type Decoder interface {

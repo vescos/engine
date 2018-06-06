@@ -5,10 +5,10 @@ package draw2d
 import (
 	//"time"
 
-	"graphs/engine/draw2d/effects"
-	"graphs/engine/draw2d/effects/ui"
-	"graphs/engine/draw2d/screen"
-	"graphs/engine/geom"
+	"github.com/vescos/engine/draw2d/effects"
+	"github.com/vescos/engine/draw2d/effects/ui"
+	"github.com/vescos/engine/draw2d/screen"
+	"github.com/vescos/engine/geom"
 )
 
 const ZINDEX_CNT = 8

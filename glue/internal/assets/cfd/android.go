@@ -48,7 +48,7 @@ import (
 	"os"
 	"unsafe"
 
-	"graphs/engine/assets"
+	"github.com/vescos/engine/assets"
 )
 
 type State struct {

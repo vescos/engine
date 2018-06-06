@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"graphs/engine/assets"
+	"github.com/vescos/engine/assets"
 )
 
 type State struct {

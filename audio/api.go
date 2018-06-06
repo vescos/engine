@@ -11,9 +11,9 @@ import (
 	"sync"
 	"unsafe"
 
-	"graphs/engine/assets"
-	"graphs/engine/audio/decoders/oggvorbis"
-	"graphs/engine/audio/decoders/wav"
+	"github.com/vescos/engine/assets"
+	"github.com/vescos/engine/audio/decoders/oggvorbis"
+	"github.com/vescos/engine/audio/decoders/wav"
 )
 
 type Source struct {

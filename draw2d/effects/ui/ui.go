@@ -3,9 +3,9 @@ package ui
 import (
 	"log"
 
-	"graphs/engine/draw2d/screen"
-	"graphs/engine/geom"
-	"graphs/engine/tobyte"
+	"github.com/vescos/engine/draw2d/screen"
+	"github.com/vescos/engine/geom"
+	"github.com/vescos/engine/tobyte"
 )
 
 type State struct {

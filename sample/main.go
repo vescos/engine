@@ -6,12 +6,12 @@ import (
 	"strings"
 	"time"
 
-	"graphs/engine/gles2"
-	"graphs/engine/glprog"
-	"graphs/engine/glue"
-	"graphs/engine/input/keys"
-	"graphs/engine/input/size"
-	"graphs/engine/input/touch"
+	"github.com/vescos/engine/gles2"
+	"github.com/vescos/engine/glprog"
+	"github.com/vescos/engine/glue"
+	"github.com/vescos/engine/input/keys"
+	"github.com/vescos/engine/input/size"
+	"github.com/vescos/engine/input/touch"
 )
 
 const (

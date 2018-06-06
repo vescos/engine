@@ -15,8 +15,8 @@ package draw2d
 import (
 	"log"
 
-	"graphs/engine/draw2d/effects"
-	"graphs/engine/draw2d/screen"
+	"github.com/vescos/engine/draw2d/effects"
+	"github.com/vescos/engine/draw2d/screen"
 )
 
 const (
