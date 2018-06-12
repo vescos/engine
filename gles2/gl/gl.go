@@ -4,7 +4,7 @@
 
 //modified from https://github.com/goxjs/gl
 
-package gles2
+package gl
 
 /*
 #cgo linux LDFLAGS: -lGLESv2

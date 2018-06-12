@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/vescos/engine/gles2"
+	"github.com/vescos/engine/gles2/gl"
 	"github.com/vescos/engine/glprog"
 	"github.com/vescos/engine/glue"
 	"github.com/vescos/engine/input/keys"
@@ -56,8 +56,8 @@ func (s *State) InitState() {
 func (s *State) Load() {}
 
 func (s *State) InitGL() {
-	log.Print(">>>>> ", "GLES version: ", gles2.GetString(gles2.VERSION))
-	dst := gles2.GetString(gles2.EXTENSIONS)
+	log.Print(">>>>> ", "GLES version: ", gl.GetString(gl.VERSION))
+	dst := gl.GetString(gl.EXTENSIONS)
 	if strings.Contains(dst, stOESETC1ExtStr) {
 		s.ETC1Ext = true
 	}
@@ -65,7 +65,7 @@ func (s *State) InitGL() {
 }
 
 func (s *State) Size(sz size.Event) {
-	gles2.Viewport(0, 0, int(s.FbWidth), int(s.FbHeight))
+	gl.Viewport(0, 0, int(s.FbWidth), int(s.FbHeight))
 }
 
 func (s *State) Resume() {}
@@ -74,9 +74,9 @@ func (s *State) StartDrawing() {}
 
 func (s *State) Draw() {
 	s.LogFps()
-	gles2.ClearColor(0.0, 1.0, 0.0, 1.0)
-	gles2.ClearDepthf(1.0)
-	gles2.Clear(gles2.COLOR_BUFFER_BIT | gles2.DEPTH_BUFFER_BIT)
+	gl.ClearColor(0.0, 1.0, 0.0, 1.0)
+	gl.ClearDepthf(1.0)
+	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 }
 
 func (s *State) StopDrawing() {}

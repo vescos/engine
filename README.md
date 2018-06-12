@@ -15,14 +15,14 @@ Android - arm(armeabi, armeabi-v7a), arm64(armv8a), 386(x86), amd64(x86_64(build
 
 ### Third party software in this library
 Some parts of glue and input are derived from [gomobile project](https://github.com/golang/mobile)  
-gles2 package is from [gl package](https://github.com/goxjs/gl)  
+gles2/gl package is from [gl package](https://github.com/goxjs/gl)  
 Ogg Vorbis decoder [stb_vorbis](http://nothings.org/stb_vorbis/) (Open Domain license)
 
 ### Dependencies 
 #### To build
 Standard Golang library/tools.
 
-Linux(X11) - C compiler(GCC)/C standard library header files.
+Linux(X11) - C compiler(GCC), X11, randr, EGL, and header files.
 
 Android - Standalone Android NDK toolchains.
 1. Download Android Ndk [https://developer.android.com/ndk/downloads/](https://developer.android.com/ndk/downloads/)
@@ -43,7 +43,8 @@ $ GOOS=android GOARCH=arm GOARM=7 CGO_ENABLED=1 \
 CC=$(NDK_ROOT_ARM)/bin/arm-linux-androideabi-gcc \  
 CXX=$(NDK_ROOT_ARM)/bin/arm-linux-androideabi-g++ \  
 go build -ldflags '-X glue.goarm=7' -buildmode=c-shared  -o /tmp/libexample.so github.com/vescos/engine/sample  
-6. Build more C chared libs if needed.  
+6. Build more C chared libs if needed.
+Minimum tested api is 16 but probably will work with 10+
 
 #### To run
 
@@ -62,5 +63,5 @@ See sample folder(sample is incomplete)
 // TODO:
 
 ### History
-Engine was part of [Labyrinth Lost Gems](https://play.google.com/store/apps/details?id=xyz.live3dgraphs.labyrinth) game(free to play but include ads)
+Engine was part of [Labyrinth Lost Gems](https://play.google.com/store/apps/details?id=xyz.live3dgraphs.labyrinth) game(include ads)
  

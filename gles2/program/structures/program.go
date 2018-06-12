@@ -1,8 +1,8 @@
 package structures
 
 import (
-	"github.com/vescos/engine/gles2"
-	"github.com/vescos/engine/glprog"
+	"github.com/vescos/engine/gles2/gl"
+	"github.com/vescos/engine/gles2/program"
 )
 
 const vs = `
@@ -57,24 +57,24 @@ const fs = `
 	}
 `
 
-func Program() *glprog.Prog {
-	return &glprog.Prog{
+func Program() *program.Prog {
+	return &program.Prog{
 		Vs:          vs,
 		Fs:          fs,
-		Mode:        gles2.TRIANGLES,
+		Mode:        gl.TRIANGLES,
 		Length:      0,
 		UseMstUnits: true,
-		Buffs: map[string]*glprog.Buff{
+		Buffs: map[string]*program.Buff{
 			"elements": {
-				Target: gles2.ELEMENT_ARRAY_BUFFER,
-				TypeGl: gles2.UNSIGNED_SHORT,
-				Usage:  gles2.STATIC_DRAW,
+				Target: gl.ELEMENT_ARRAY_BUFFER,
+				TypeGl: gl.UNSIGNED_SHORT,
+				Usage:  gl.STATIC_DRAW,
 			},
 			"allFloats": {
-				Target: gles2.ARRAY_BUFFER,
-				TypeGl: gles2.FLOAT,
-				Usage:  gles2.STATIC_DRAW,
-				Attribs: map[string]*glprog.Attrib{
+				Target: gl.ARRAY_BUFFER,
+				TypeGl: gl.FLOAT,
+				Usage:  gl.STATIC_DRAW,
+				Attribs: map[string]*program.Attrib{
 					"vertices": {
 						Name:       "a_vertex",
 						Size:       3,
@@ -113,7 +113,7 @@ func Program() *glprog.Prog {
 				},
 			},
 		},
-		Uniforms: map[string]*glprog.Uniform{
+		Uniforms: map[string]*program.Uniform{
 			"mergedMatrix": {
 				Name: "u_merged_matrix",
 				Fn:   "uniformMatrix4fv",
