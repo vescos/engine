@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/vescos/engine/gles2/gl"
-	"github.com/vescos/engine/glprog"
+	"github.com/vescos/engine/gles2/program"
 	"github.com/vescos/engine/glue"
 	"github.com/vescos/engine/input/keys"
 	"github.com/vescos/engine/input/size"
@@ -46,7 +46,7 @@ func main() {
 // State implements glue.Engine interface
 type State struct {
 	*glue.Glue
-	programs map[string]*glprog.Prog
+	programs map[string]*program.Prog
 	ETC1Ext  bool
 }
 

@@ -16,8 +16,8 @@ const (
 type ImageTextures struct {
 	Images  []*image.RGBA
 	Format  gl.Enum `json:"Format"`
-	FileExt string     `json:"FileExt"`
-	GenMips bool       `json:"GenMips"`
+	FileExt string  `json:"FileExt"`
+	GenMips bool    `json:"GenMips"`
 }
 
 type MipmapETC1 struct {
@@ -36,7 +36,7 @@ type CompressedETC1Textures struct {
 
 type Texture struct {
 	Target        gl.Enum   `json:"target"`
-	Sources       []string     `json:"sources"`
+	Sources       []string  `json:"sources"`
 	Texturemap    []gl.Enum `json:"texturemap"`
 	Unit          gl.Enum   `json:"unit"`
 	Texture       gl.Texture
@@ -58,7 +58,6 @@ func (t *Texture) SetImage(i int, img *image.RGBA) {
 func (t *Texture) Set(tex gl.Texture) {
 	t.Texture = tex
 }
-
 
 func Build2DTexture(t *Texture, ctMaxTexureU int) gl.Texture {
 	var texture gl.Texture
