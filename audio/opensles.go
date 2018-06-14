@@ -14,9 +14,8 @@ import (
 )
 
 func openDevice(aParams *AudioParams) unsafe.Pointer {
-	aParams.frameSize = aParams.SampleSize * aParams.Channels
-	aParams.frameRate = aParams.SampleRate / aParams.Channels
-	aParams.periodSize = int(float32(aParams.frameRate) * (float32(aParams.PeriodTime) / 1000000))
+	aParams.frameSize = int(aParams.SampleSize) * int(aParams.Channels)
+	aParams.periodSize = int(float32(aParams.SampleRate) * (float32(aParams.PeriodTime) / 1000000))
 	aParams.buffSize = aParams.periodSize * aParams.BuffSizeCnt
 	aParams.buffBytes = aParams.buffSize * aParams.frameSize
 	handle := unsafe.Pointer(C.getOslHandle(C.uint(aParams.BuffSizeCnt), C.uint(aParams.buffBytes)))

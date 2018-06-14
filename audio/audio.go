@@ -3,8 +3,6 @@
 // Part of "Labyrinth lost gems" game engine android/linux version.
 // Audio player(mixer), ALSA and OpenSL ES backends
 
-// TODO: increase/decrease audio strenght by distance.
-// TODO: more formats (only WAV|OGG 16bit 2channels interleaved LE is supported for now)
 package audio
 
 import (
@@ -100,35 +98,13 @@ type ctlStream struct {
 	complete bool
 }
 
-// audio parameters, HARDCODED for now
-type AccessMode int // access mode
-const (
-	ModeInterleaved AccessMode = iota
-	ModeNonInterleaved
-)
-
-type AudioParams struct {
-	//Format int
-	//AccessMode int // interleaved, noninterleaved (NOTIMPLEMENTED)
-	SampleRate  int // samples per second
-	SampleSize  int // in bytes 16bit = 2 bytes
-	Channels    int // mono = 1, stereo = 2, 5.1 = 6
-	PeriodTime  int // in microsecons (us)
-	BuffSizeCnt int // buffSize = periodSize * BuffSizeCnt
-
-	periodSize int // in frames, frameRate * (PeriodTime / 1000000)
-	buffSize   int // in frames, periodSize * BuffSizeCnt (or more?)
-	buffBytes  int // in bytes, buffSize * frameSize
-	frameRate  int // SampleRate / Channels
-	frameSize  int // SampleSize * Channels
-}
-
 const (
 	splitStr      string = "__!__"
 	emptyStreamId string = "sgweedgtehbxc235SDFfsd@#Fs_"
-	rbc           int    = 15876 * 5 // why 79385
-	maxEvents     int    = 20
-	maxSleep      int    = 5 // in ms
+	// ring buffer size in bytes
+	rbc       int = 100 * 1024 // 100KB
+	maxEvents int = 20
+	maxSleep  int = 5 // in ms
 )
 
 func (player *Player) processEvents() {
@@ -335,7 +311,7 @@ func (player *Player) processEvents() {
 	}
 }
 
-func poller(player *Player) {
+func poller(player *Player, params *AudioParams) {
 	log.Print(">>>>> audio: Start.")
 	if !player.initialized {
 		player.sources = make(map[string]*Source, 0)
@@ -355,15 +331,6 @@ func poller(player *Player) {
 		rbs       int = 0 // ring buff start
 	)
 
-	// HARDCODED for now
-	params := &AudioParams{
-		//AccessMode: ModeInterleaved,
-		SampleRate:  44100,
-		SampleSize:  2,
-		Channels:    2,
-		PeriodTime:  30 * 1000, // 30ms //TODO: test latency vs performance
-		BuffSizeCnt: 3,
-	}
 	player.handle = openDevice(params)
 
 	if player.handle != nil {
@@ -378,7 +345,7 @@ func poller(player *Player) {
 		// Mixer
 		// Mix multiple streams into single stream and write result to output buffer
 		if player.state && player.play && write_avail {
-			samples_to_read := (params.buffBytes - len(mix_buff)) / params.Channels
+			samples_to_read := (params.buffBytes - len(mix_buff)) / int(params.Channels)
 			if samples_to_read > 0 {
 				// check and start rand and interval streams if it is time
 				for _, stream := range player.streams {
@@ -388,15 +355,15 @@ func poller(player *Player) {
 						}
 					}
 				}
-				for i := 0; i < samples_to_read && len(player.streams) > 0; i += params.Channels {
-					// HARDCODED to 16 bit audio
+				for i := 0; i < samples_to_read && len(player.streams) > 0; i += int(params.Channels) {
+					// HARDCODED to 16 bit 2 chan audio
 					var f0, f1 uint16
 					frame_has_val := false
 					// TODO: optimize loops and mapaccess
 					for key, stream := range player.streams {
 						if stream.playing {
 							// stream ended: restart or delete stream
-							if stream.srcPtr.length-stream.readAt < params.Channels {
+							if stream.srcPtr.length-stream.readAt < int(params.Channels) {
 								if stream.deleted {
 									delete(player.streams, key) //safe to delete key in range
 									continue
@@ -448,13 +415,13 @@ func poller(player *Player) {
 								f1 = (f1 + b1) - ((f1 * b1) / 65535)
 								frame_has_val = true
 							}
-							stream.readAt += params.Channels
+							stream.readAt += int(params.Channels)
 						}
 					}
 					// convert uint16 to byte
 					// empty frames will be skipped from buffer!!!
 					if frame_has_val {
-						//HARDCODED to 2 channel 16 bit audio
+						//HARDCODED to 16 bit 2 channels audio
 						//for skey, a := range frame {}
 						l1 := byte(f0)
 						l2 := byte(f0 >> 8)

@@ -1,8 +1,10 @@
 // Veselin Kostov April, 2017
 
-// TODO: streaming instead of load entire audio file
-// TODO: pass AudioParams at NewPlayer instead of hardcoded
-// TODO: audio strenght per stream and/or general
+// mixer supports oggvorbis or wav, 16 bit, stereo, 44100 or 48000 audio, interleaved, LE.
+
+// TODO: add streaming for audio files
+// TODO: increase/decrease audio strenght by distance(per stream).
+// TODO: increase/decrease audio strenght(for player).
 package audio
 
 import (
@@ -14,6 +16,31 @@ import (
 	"github.com/vescos/engine/assets"
 	"github.com/vescos/engine/audio/decoders/oggvorbis"
 	"github.com/vescos/engine/audio/decoders/wav"
+)
+
+type Channels int
+
+const (
+	Stereo Channels = 2
+)
+
+type SampleSize int
+
+const (
+	SampleSize16 SampleSize = 2
+)
+
+type SampleRate int
+
+const (
+	SampleRate44100 SampleRate = 44100
+	SampleRate48000 SampleRate = 48000
+)
+
+type AccessMode int // access mode
+const (
+	Interleaved AccessMode = iota
+	//NonInterleaved
 )
 
 type Source struct {
@@ -39,8 +66,23 @@ type Player struct {
 	mutex  sync.Mutex
 }
 
+type AudioParams struct {
+	//Format int
+	AccessMode  AccessMode // interleaved, noninterleaved (NOTIMPLEMENTED)
+	SampleRate  SampleRate // samples per second in Hz
+	SampleSize  SampleSize // in bytes 16bit = 2 bytes - 20bit and other non multiple of 8 are not supported
+	Channels    Channels   // Mono, Stereo
+	PeriodTime  int        // in microsecons (us)
+	BuffSizeCnt int        // buffSize = periodSize * BuffSizeCnt
+
+	periodSize int // in frames, sampleRate * (PeriodTime / 1000000)
+	buffSize   int // in frames, periodSize * BuffSizeCnt (or more?)
+	buffBytes  int // in bytes, buffSize * frameSize
+	frameSize  int // SampleSize * Channels
+}
+
 //Start player
-func NewPlayer(p *Player) *Player {
+func NewPlayer(p *Player, params AudioParams) *Player {
 	if p == nil {
 		p = &Player{}
 	} else {
@@ -49,7 +91,7 @@ func NewPlayer(p *Player) *Player {
 		}
 	}
 	p.in = make(chan interface{}, 100)
-	go poller(p)
+	go poller(p, &params)
 	p.mutex.Lock()
 	p.runing = true
 	p.mutex.Unlock()
@@ -165,7 +207,7 @@ func (p *Player) Stop() {
 }
 
 // Stop() can happen between call to isRunning() and call to api.
-// As channel is buffered such calls will not block (almost till channel is full)
+// As channel is buffered such calls will not block (almost till channel is not full)
 // but all commands sent between Stop() and NewPlayer(stoped_player) will be discarded.
 func (p *Player) IsRuning() bool {
 	return p.runing

@@ -102,8 +102,7 @@ func setHWParams(h unsafe.Pointer, aParams *AudioParams) bool {
 	C.snd_pcm_hw_params_get_period_size(params, &period_size, nil)
 	C.snd_pcm_hw_params_get_buffer_size(params, &buffer_size)
 
-	aParams.frameRate = int(rate) / aParams.Channels
-	aParams.frameSize = int(aParams.SampleSize * aParams.Channels)
+	aParams.frameSize = int(int(aParams.SampleSize) * int(aParams.Channels))
 	aParams.periodSize = int(period_size)
 	aParams.buffSize = int(buffer_size)
 	aParams.buffBytes = aParams.buffSize * aParams.frameSize
@@ -199,7 +198,7 @@ func writeBuff(h unsafe.Pointer, buff []byte, aParams *AudioParams) (bool, int, 
 			return false, 0, false
 		}
 	}
-	return true, err * aParams.Channels * aParams.SampleSize, true
+	return true, err * int(aParams.Channels) * int(aParams.SampleSize), true
 }
 
 func closeDevice(h unsafe.Pointer) {
