@@ -288,7 +288,7 @@ void saveSharedPrefs(ANativeActivity* activity, char * prefsName, char * prefs) 
 	} 
 	
 	jmethodID applyM = (*env)->GetMethodID(env, editorClass, "apply", "()V");
-	(*env)->CallObjectMethod(env, editorObj, applyM);
+	(*env)->CallVoidMethod(env, editorObj, applyM);
 	
 	(*vm)->DetachCurrentThread(vm);
 }
