@@ -1,11 +1,22 @@
 // gl textures
+// TODO: this is incomplete(refactoring needed)
+
 // gl functions must be called only from main(goroutine that bound context)
 
 package texture
 
 import (
+	"bytes"
+	"encoding/gob"
 	"image"
+	"image/draw"
+	//_ "image/jpeg"
+	_ "image/png"
+	"io"
+	"log"
+	"strconv"
 
+	"github.com/vescos/engine/assets"
 	"github.com/vescos/engine/gles2/gl"
 )
 
@@ -59,7 +70,7 @@ func (t *Texture) Set(tex gl.Texture) {
 	t.Texture = tex
 }
 
-func Build2DTexture(t *Texture, ctMaxTexureU int) gl.Texture {
+func Build2D(t *Texture, ctMaxTexureU int) gl.Texture {
 	var texture gl.Texture
 	if int(t.Unit) > ctMaxTexureU-1 {
 		return texture
@@ -87,7 +98,7 @@ func Build2DTexture(t *Texture, ctMaxTexureU int) gl.Texture {
 	return texture
 }
 
-func BuildCubeMapTexture(t *Texture, ctMaxTexureU int) gl.Texture {
+func BuildCubeMap(t *Texture, ctMaxTexureU int) gl.Texture {
 	var texture gl.Texture
 	if int(t.Unit) > ctMaxTexureU-1 {
 		return texture
@@ -117,3 +128,124 @@ func BuildCubeMapTexture(t *Texture, ctMaxTexureU int) gl.Texture {
 	}
 	return texture
 }
+
+func Png(t *Texture, am assets.FileManager) {
+	for i := range t.Sources {
+		fname := t.Sources[i] + "." + t.Images.FileExt
+		file, err := am.OpenAsset(fname)
+		if err == nil {
+			defer file.Close()
+			img, _, err := image.Decode(file)
+			if err == nil {
+				b := img.Bounds()
+				newImg := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+				draw.Draw(newImg, newImg.Bounds(), img, b.Min, draw.Src)
+				t.SetImage(i, newImg)
+				img = nil
+			} else {
+				log.Print("texturesLoadFiles: ", err, ": ", fname)
+			}
+		} else {
+			log.Print("texturesLoadFiles", err, ": ", fname)
+		}
+	}
+}
+
+func Etc1(t *Texture, am assets.FileManager, startAt int) {
+	index := 0
+	for i := range t.Sources {
+		for j := startAt; j < t.ComprETC1.MipmapLevels; j += 1 {
+			fname := t.Sources[i] + "_mip_" + strconv.Itoa(j) + ".pkm"
+			file, err := am.OpenAsset(fname)
+			if err == nil {
+				defer file.Close()
+				var buff bytes.Buffer
+				_, err := buff.ReadFrom(file)
+				if err != nil && err != io.EOF {
+					log.Print("texturesLoadCompressedFile", err, ": ", fname)
+					return
+				}
+
+				img := buff.Bytes()
+				wb := img[12:14]
+				hb := img[14:16]
+				var tmap gl.Enum = gl.TEXTURE_2D
+				if t.Target == gl.TEXTURE_CUBE_MAP {
+					tmap = t.Texturemap[i]
+				}
+				t.ComprETC1.Mipmaps[index] = &MipmapETC1{
+					Level:  j - startAt,
+					Target: tmap,
+					W:      int(wb[0])*256 + int(wb[1]),
+					H:      int(hb[0])*256 + int(hb[1]),
+					Mipmap: img[16:],
+				}
+			} else {
+				log.Print("texturesLoadCompressedFile", err, ": ", fname)
+			}
+			index += 1
+		}
+	}
+}
+
+func DescrFromGob(fname string, am assets.FileManager) (map[string]*Texture) {
+	var t map[string]*Texture
+	file, err := am.OpenAsset(fname)
+	if err == nil {
+		defer file.Close()
+		dec := gob.NewDecoder(file)
+		err := dec.Decode(&t)
+		if err != nil {
+			if err != io.EOF {
+				log.Print("texturesSet: ", err)
+			}
+		}
+	} else {
+		log.Print("texturesSet: ", err)
+	}
+	//TODO: make mipmaps and images
+	for key := range t {
+		txtr := t[key]
+		n := 1
+		if txtr.Target == gl.TEXTURE_CUBE_MAP {
+			n = 6
+		}
+		txtr.Images.Images = make([]*image.RGBA, n)
+		if txtr.ComprETC1.Available {
+			txtr.ComprETC1.Mipmaps = make([]*MipmapETC1, n*txtr.ComprETC1.MipmapLevels)
+		}
+		t[key] = txtr
+	}
+	return t
+}
+
+func BuildAll(txs map[string]*Texture, am assets.FileManager, maxTextureUnits int, startAt int) {
+	for key, t := range txs {
+		if t.Disabled {
+			continue
+		}
+		if t.ComprETC1 != nil && t.ComprETC1.Available {
+			t.UseCompressed = true
+			Etc1(t, am, startAt)
+		} else {
+			t.UseCompressed = false
+			Png(t, am)
+		}
+		if t.Target == gl.TEXTURE_2D {
+			t.Set(Build2D(t, maxTextureUnits))
+		} else if t.Target == gl.TEXTURE_CUBE_MAP {
+			t.Set(BuildCubeMap(t, maxTextureUnits))
+		} else {
+			log.Print("Target not Supported: ", t.Target)
+		}
+		for i := range t.Sources {
+			txs[key].Images.Images[i] = nil
+		}
+		if t.ComprETC1 != nil {
+			for i := range t.ComprETC1.Mipmaps {
+				txs[key].ComprETC1.Mipmaps[i] = nil
+			}
+		}
+	}
+}
+
