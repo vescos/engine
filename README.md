@@ -52,7 +52,7 @@ Linux(X11) - mesa with gles2.
 
 Android - use Your prefered method to build and install Android packages.   
 No java code is needed to run engine. Mixing with java and jni code is possible.  
-Use glue.State.hackEngine() to obtain C struct that holds references to nativeActivity object.  
+Use glue.State.HackEngine() to obtain C struct that holds references to nativeActivity object.  
 See definition of this structure in glue/android.h file. 
 
 ### Install
@@ -63,5 +63,5 @@ See sample folder(sample is incomplete)
 // TODO:
 
 ### History
-Engine was part of [Labyrinth Lost Gems](https://play.google.com/store/apps/details?id=xyz.live3dgraphs.labyrinth) game(include ads)
+LabyrinthEngine was part of [Labyrinth Lost Gems](https://play.google.com/store/apps/details?id=xyz.live3dgraphs.labyrinth) game(include ads)
  

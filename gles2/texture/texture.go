@@ -1,7 +1,7 @@
 // gl textures
 // TODO: this is incomplete(refactoring needed)
 
-// gl functions must be called only from main(goroutine that bound context)
+// gl functions must be called only from main(goroutine that bound context) and after context is bound!!!
 
 package texture
 
@@ -60,14 +60,6 @@ type Texture struct {
 	ComprETC1     *CompressedETC1Textures `json:"Compr"`
 	UseCompressed bool
 	AtlassMap     map[string][8]float32 `json:"atlassMap"`
-}
-
-func (t *Texture) SetImage(i int, img *image.RGBA) {
-	t.Images.Images[i] = img
-}
-
-func (t *Texture) Set(tex gl.Texture) {
-	t.Texture = tex
 }
 
 func Build2D(t *Texture, ctMaxTexureU int) gl.Texture {
@@ -140,7 +132,7 @@ func Png(t *Texture, am assets.FileManager) {
 				b := img.Bounds()
 				newImg := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
 				draw.Draw(newImg, newImg.Bounds(), img, b.Min, draw.Src)
-				t.SetImage(i, newImg)
+				t.Images.Images[i] = newImg
 				img = nil
 			} else {
 				log.Print("texturesLoadFiles: ", err, ": ", fname)
@@ -219,33 +211,30 @@ func DescrFromGob(fname string, am assets.FileManager) (map[string]*Texture) {
 	return t
 }
 
-func BuildAll(txs map[string]*Texture, am assets.FileManager, maxTextureUnits int, startAt int) {
-	for key, t := range txs {
-		if t.Disabled {
-			continue
-		}
-		if t.ComprETC1 != nil && t.ComprETC1.Available {
-			t.UseCompressed = true
-			Etc1(t, am, startAt)
-		} else {
-			t.UseCompressed = false
-			Png(t, am)
-		}
-		if t.Target == gl.TEXTURE_2D {
-			t.Set(Build2D(t, maxTextureUnits))
-		} else if t.Target == gl.TEXTURE_CUBE_MAP {
-			t.Set(BuildCubeMap(t, maxTextureUnits))
-		} else {
-			log.Print("Target not Supported: ", t.Target)
-		}
-		for i := range t.Sources {
-			txs[key].Images.Images[i] = nil
-		}
-		if t.ComprETC1 != nil {
-			for i := range t.ComprETC1.Mipmaps {
-				txs[key].ComprETC1.Mipmaps[i] = nil
-			}
-		}
+// Load all texures in set to GPU
+func LoadAll(txs map[string]*Texture, am assets.FileManager, maxTextureUnits int, startAt int) {
+	for _, t := range txs {
+		Load(t, am, maxTextureUnits, startAt)
 	}
 }
 
+// Load single texture to GPU
+func Load(t *Texture, am assets.FileManager, maxTextureUnits int, startAt int) {
+	if t.Disabled {
+		return
+	}
+	if t.ComprETC1 != nil && t.ComprETC1.Available {
+		t.UseCompressed = true
+		Etc1(t, am, startAt)
+	} else {
+		t.UseCompressed = false
+		Png(t, am)
+	}
+	if t.Target == gl.TEXTURE_2D {
+		t.Texture = Build2D(t, maxTextureUnits)
+	} else if t.Target == gl.TEXTURE_CUBE_MAP {
+		t.Texture = BuildCubeMap(t, maxTextureUnits)
+	} else {
+		log.Print("Target not Supported: ", t.Target)
+	}
+}
