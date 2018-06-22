@@ -81,22 +81,16 @@ type AudioParams struct {
 	frameSize  int // SampleSize * Channels
 }
 
-//Start player
-func NewPlayer(p *Player, params AudioParams) *Player {
-	if p == nil {
-		p = &Player{}
-	} else {
-		if len(p.in) > 0 {
-			log.Printf("Audio: NewPlayer: discarding %v commands.", len(p.in))
-		}
+func (p *Player) Start(params AudioParams) {
+	if len(p.in) > 0 {
+		log.Printf("Audio: NewPlayer: discarding %v commands.", len(p.in))
 	}
 	p.in = make(chan interface{}, 100)
 	go poller(p, &params)
 	p.mutex.Lock()
 	p.runing = true
 	p.mutex.Unlock()
-	return p
-}
+} 
 
 // Load wav file and add as source
 // Loading is happening in main thread, audio will block if loading is there
