@@ -15,8 +15,9 @@ const vs = `
 	varying vec3 v_texture_coord;
 	  
 	void main(void) {
-		gl_Position = u_rotation_matrix * vec4(a_vertex, 1.0);
 		v_texture_coord = a_vertex;
+		vec4 pos = u_rotation_matrix * vec4(a_vertex, 1.0);
+		gl_Position = pos.xyww;
 	}
 `
 const fs = `
