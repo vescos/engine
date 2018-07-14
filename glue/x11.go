@@ -280,7 +280,7 @@ func (g *Glue) processEvents(s State) {
 			cmEvent := (*C.XClientMessageEvent)(unsafe.Pointer(&event))
 			data := uint32(cmEvent.data[0]) | (uint32(cmEvent.data[1]) << 8) |
 				(uint32(cmEvent.data[2]) << 16) | (uint32(cmEvent.data[3]) << 24)
-			if g.cRefs.wmDeleteWindow != C.None && C.ulong(data) == g.cRefs.wmDeleteWindow {
+			if g.cRefs.wmDeleteWindow != C.None && C.Atom(data) == g.cRefs.wmDeleteWindow {
 				g.AppExit(s)
 				return
 			}
