@@ -44,7 +44,6 @@ type Prog struct {
 	Length      int
 	Buffs       map[string]*Buff
 	Uniforms    map[string]*Uniform
-	MstUnits    [32]int32
 	UseMstUnits bool
 }
 
@@ -96,7 +95,7 @@ func (p *Prog) BuildProgram() {
 	}
 }
 
-func DrawObject(prog *Prog, ctMaxTexureU int) {
+func DrawObject(prog *Prog, offset int, count int) {
 	if prog.Length <= 0 {
 		return
 	}
@@ -131,30 +130,8 @@ func DrawObject(prog *Prog, ctMaxTexureU int) {
 		}
 	}
 	if prog.Mode == gl.TRIANGLES {
-		if prog.UseMstUnits {
-			offset := 0
-			count := 0
-			for k, v := range prog.MstUnits {
-				if v == 0 {
-					continue
-				}
-				count = int(v)
-				//FIXME: hardcoded to use unit 6 and 7 if limit is set to max 8
-				if ctMaxTexureU-1 < k {
-					gl.Uniform1i(prog.Uniforms["texture"].Location, 6)
-					gl.Uniform1i(prog.Uniforms["texture_normal"].Location, 7)
-				} else {
-					gl.Uniform1i(prog.Uniforms["texture"].Location, int(k))
-					gl.Uniform1i(prog.Uniforms["texture_normal"].Location, int(k+1))
-				}
-				gl.BindBuffer(prog.Buffs["elements"].Target, prog.Buffs["elements"].Buffer)
-				gl.DrawElements(prog.Mode, count, prog.Buffs["elements"].TypeGl, offset*2)
-				offset += count
-			}
-		} else {
-			gl.BindBuffer(prog.Buffs["elements"].Target, prog.Buffs["elements"].Buffer)
-			gl.DrawElements(prog.Mode, prog.Length, prog.Buffs["elements"].TypeGl, 0)
-		}
+		gl.BindBuffer(prog.Buffs["elements"].Target, prog.Buffs["elements"].Buffer)
+		gl.DrawElements(prog.Mode, count, prog.Buffs["elements"].TypeGl, offset)
 	}
 }
 
