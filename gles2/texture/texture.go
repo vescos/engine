@@ -50,6 +50,7 @@ type Texture struct {
 	Sources       []string  `json:"sources"`
 	Texturemap    []gl.Enum `json:"texturemap"`
 	Unit          gl.Enum   `json:"unit"`
+	mstID	int	`json:"mstID"`
 	Texture       gl.Texture
 	WrapS         int `json:"wrap_s"`
 	WrapT         int `json:"wrap_t"`
@@ -119,6 +120,19 @@ func BuildCubeMap(t *Texture, ctMaxTexureU int) gl.Texture {
 		}
 	}
 	return texture
+}
+
+// Requires OES_depth_texture
+func BuildTextureAttachment(w, h int, unit gl.Enum) gl.Texture {
+	gl.ActiveTexture(gl.TEXTURE0 + unit)
+    texture := gl.CreateTexture()
+    gl.BindTexture(gl.TEXTURE_2D, texture)
+    gl.TexImage2D(gl.TEXTURE_2D, 0, w, h, gl.DEPTH_COMPONENT, gl.UNSIGNED_INT, nil)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+	gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    return texture
 }
 
 func Png(t *Texture, am assets.FileManager) {
