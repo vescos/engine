@@ -448,7 +448,11 @@ func poller(player *Player, params *AudioParams) {
 					mix_buff = append(mix_buff, tmp_slice...)
 				} else {
 					// advance in the ring buffer
-					mix_buff = ring_buff[rbs : rbs+(n-cnt) : rbs+params.buffBytes]
+					sz := n - cnt
+					if sz < 0 {
+						sz = 0
+					}
+					mix_buff = ring_buff[rbs : rbs+sz : rbs+params.buffBytes]
 				}
 
 			}
