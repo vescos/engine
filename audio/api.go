@@ -90,7 +90,7 @@ func (p *Player) Start(params AudioParams) {
 	p.mutex.Lock()
 	p.runing = true
 	p.mutex.Unlock()
-} 
+}
 
 // Load wav file and add as source
 // Loading is happening in main thread, audio will block if loading is there

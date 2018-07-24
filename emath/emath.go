@@ -99,12 +99,41 @@ func Mat4RotationXYZ(xa, ya, za float32) []float32 {
 	return Mat4Multi(Mat4RotationX(xa), Mat4Multi(Mat4RotationY(ya), Mat4RotationZ(za)))
 }
 
+// Perspective projection matrix
 func Mat4Frustum(left, right, bottom, top, near, far float32) []float32 {
 	return []float32{
 		(2 * near) / (right - left), 0, 0, 0,
 		0, (2 * near) / (top - bottom), 0, 0,
 		(right + left) / (right - left), (top + bottom) / (top - bottom), -((far + near) / (far - near)), -1,
 		0, 0, -((2 * far * near) / (far - near)), 0,
+	}
+}
+
+// Orthographic projection matrix
+func Mat4Ortho(left, right, bottom, top, near, far float32) []float32 {
+	return []float32{
+		2 / (right - left), 0, 0, 0,
+		0, 2 / (top - bottom), 0, 0,
+		0, 0, 2 / (near - far), 0,
+		(left + right) / (left - right), (bottom + top) / (bottom - top), (near + far) / (near - far), 1,
+	}
+}
+
+// Return lookAt matrix
+func Mat4LookAt(eye, center, up []float32) []float32 {
+	f := Vec3Normalize(Vec3Substract(center, eye))
+	upN := Vec3Normalize(up)
+	s := Vec3Normalize(Vec3Cross(f, upN))
+	if Vec3Magnitude(s) <= 0 {
+		log.Print("Mat4LookAt: center is parallel to up: returning identity matrix")
+		return Mat4Identity()
+	}
+	u := Vec3Cross(s, f)
+	return []float32{
+		s[0], u[0], -f[0], 0,
+		s[1], u[1], -f[1], 0,
+		s[2], u[2], -f[2], 0,
+		-Vec3Dot(s, eye), -Vec3Dot(u, eye), Vec3Dot(f, eye), 1,
 	}
 }
 
@@ -159,6 +188,13 @@ func Vec2Normalize(v []float32) []float32 {
 	}
 	log.Print("vec2Normalize: can't normalize zero vector: ", v)
 	return v
+}
+func Vec3Cross(v1, v2 []float32) []float32 {
+	return []float32{
+		(v1[1] * v2[2]) - (v1[2] * v2[1]),
+		(v1[2] * v2[0]) - (v1[0] * v2[2]),
+		(v1[0] * v2[1]) - (v1[1] * v2[0]),
+	}
 }
 func Vec3Dot(v1, v2 []float32) float32 {
 	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2]
