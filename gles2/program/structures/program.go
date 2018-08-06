@@ -10,9 +10,7 @@ const vs = `
 		
 	attribute vec3 a_vertex;
 	attribute vec2 a_texture_coord;
-	attribute vec3 a_normal_vector;
-	attribute vec3 a_tangent;
-	attribute vec3 a_bitangent;
+	attribute mat3 a_tspace_matrix;
 
 	uniform mat4 u_merged_matrix;
 	uniform mat4 u_shadowmap_matrix;
@@ -25,8 +23,7 @@ const vs = `
 		  
 	void main(void) {
 		v_texture_coord = a_texture_coord;
-		mat3 t_space = mat3(a_tangent, a_bitangent, a_normal_vector);
-		v_l = normalize(u_diffuse_vector * t_space);
+		v_l = normalize(u_diffuse_vector * a_tspace_matrix);
 		v_shadow_coord = u_shadowmap_matrix * vec4(a_vertex, 1.0);
 		gl_Position = u_merged_matrix * vec4(a_vertex, 1.0);
 	}
@@ -102,26 +99,13 @@ func Program() *program.Prog {
 						Stride:     14 * 4,
 						Offset:     3 * 4,
 					},
-					"normals": {
-						Name:       "a_normal_vector",
-						Size:       3,
+					"tspaceMatrix": {
+						Name:       "a_tspace_matrix",
+						Size:       9,
 						Normalized: false,
 						Stride:     14 * 4,
 						Offset:     5 * 4,
-					},
-					"tangents": {
-						Name:       "a_tangent",
-						Size:       3,
-						Normalized: false,
-						Stride:     14 * 4,
-						Offset:     8 * 4,
-					},
-					"bitangents": {
-						Name:       "a_bitangent",
-						Size:       3,
-						Normalized: false,
-						Stride:     14 * 4,
-						Offset:     11 * 4,
+						MatSize:	3,
 					},
 				},
 			},

@@ -26,6 +26,7 @@ type Attrib struct {
 	Normalized bool
 	Stride     int
 	Offset     int
+	MatSize int // if attribute is matrix 
 }
 
 type Buff struct {
@@ -104,15 +105,32 @@ func DrawObject(prog *Prog, offset int, count int) {
 	gl.BindBuffer(t.Target, t.Buffer)
 	for attr := range t.Attribs {
 		l := gl.GetAttribLocation(prog.P, t.Attribs[attr].Name)
-		gl.VertexAttribPointer(
-			l,
-			t.Attribs[attr].Size,
-			t.TypeGl,
-			t.Attribs[attr].Normalized,
-			t.Attribs[attr].Stride,
-			t.Attribs[attr].Offset)
-		gl.EnableVertexAttribArray(l)
-		defer gl.DisableVertexAttribArray(l) //it is ok to call deffer in loop
+		if t.Attribs[attr].MatSize > 1 {
+			for j := 0; j < t.Attribs[attr].MatSize; j += 1 {
+				loc := gl.Attrib{l.Value + uint(j)}
+				gl.VertexAttribPointer(
+					loc,
+					t.Attribs[attr].Size / t.Attribs[attr].MatSize,
+					t.TypeGl,
+					t.Attribs[attr].Normalized,
+					t.Attribs[attr].Stride,
+					t.Attribs[attr].Offset + (j * 4 * t.Attribs[attr].MatSize),
+				)
+				gl.EnableVertexAttribArray(loc)
+				defer gl.DisableVertexAttribArray(loc) 
+			}
+		} else {
+			gl.VertexAttribPointer(
+				l,
+				t.Attribs[attr].Size,
+				t.TypeGl,
+				t.Attribs[attr].Normalized,
+				t.Attribs[attr].Stride,
+				t.Attribs[attr].Offset,
+			)
+			gl.EnableVertexAttribArray(l)
+			defer gl.DisableVertexAttribArray(l) //it is ok to call deffer in loop
+		}
 	}
 
 	for key := range prog.Uniforms {
