@@ -15,17 +15,20 @@ const vs = `
 	attribute vec3 a_bitangent;
 
 	uniform mat4 u_merged_matrix;
+	uniform mat4 u_shadowmap_matrix;
 	uniform vec3 u_diffuse_vector;
 		
 	varying vec2 v_texture_coord;
-	//light vector in tangent space
+	// light vector in tangent space
 	varying vec3 v_l;
+	varying vec4 v_shadow_coord;
 		  
 	void main(void) {
-		gl_Position = u_merged_matrix * vec4(a_vertex, 1.0);
 		v_texture_coord = a_texture_coord;
 		mat3 t_space = mat3(a_tangent, a_bitangent, a_normal_vector);
 		v_l = normalize(u_diffuse_vector * t_space);
+		v_shadow_coord = u_shadowmap_matrix * vec4(a_vertex, 1.0);
+		gl_Position = u_merged_matrix * vec4(a_vertex, 1.0);
 	}
 `
 const fs = `
@@ -34,26 +37,36 @@ const fs = `
 	precision mediump float;
 
 	uniform vec3 u_ambient;
-	uniform vec3 u_diffuse;//light's diffuse color
+	uniform vec3 u_diffuse; // light's diffuse color
 	uniform sampler2D u_texture;
 	uniform sampler2D u_texture_normal;
+	uniform sampler2D u_shadow_map;
 
 	varying vec2 v_texture_coord;
 	//light vector in tangent space
 	varying vec3 v_l;
+	varying vec4 v_shadow_coord;
 
 	//diffuse = max(l.n, 0) * diffuse_light * diffuse_material
 	//l - v_l - light vector in tangent space
 	//n - per pixel normal vector in tangent space
 	void main(void) {
-		//the material's diffuse color
+		// shadow
+		vec4 shadow_coord_wd = v_shadow_coord / v_shadow_coord.w;
+		shadow_coord_wd.z += 0.0005;
+		float distance = texture2D(u_shadow_map, shadow_coord_wd.st).r;
+		float shadow = 1.0;
+	 	if (v_shadow_coord.w > 0.0)
+	 		shadow = distance < shadow_coord_wd.z ? 0.2 : 1.0 ;
+
+
+		// the material's diffuse color
 		vec3  diffuse_material = texture2D(u_texture, v_texture_coord.st).rgb;
 		vec4 nc = texture2D(u_texture_normal, v_texture_coord.st); 
-		//per pixel normal vector in tangent space
-		vec3 n = nc.rgb * 2.0 - 1.0;
-		//FIXME: Is implementation of ambient correct?
-		vec3 diffuse = (u_ambient + max(dot(v_l, n), 0.0) * u_diffuse) * diffuse_material;
-		gl_FragColor = vec4(diffuse, 1.0);
+		// per pixel normal vector in tangent space
+		vec3 n = (nc.rgb * 2.0) - 1.0;
+		vec3 color = (u_ambient + shadow * max(dot(v_l, n), 0.0) * u_diffuse) * diffuse_material;
+		gl_FragColor = vec4(color, 1.0);
 	}
 `
 
@@ -118,6 +131,10 @@ func Program() *program.Prog {
 				Name: "u_merged_matrix",
 				Fn:   "uniformMatrix4fv",
 			},
+			"shadowMatrix": {
+				Name: "u_shadowmap_matrix",
+				Fn:   "uniformMatrix4fv",
+			},
 			//hardcoded in gles2DrawObject
 			"texture": {
 				Name: "u_texture",
@@ -125,6 +142,10 @@ func Program() *program.Prog {
 			},
 			"texture_normal": {
 				Name: "u_texture_normal",
+				Fn:   "uniform1i",
+			},
+			"shadow_map": {
+				Name: "u_shadow_map",
 				Fn:   "uniform1i",
 			},
 			"ambient": {

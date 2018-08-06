@@ -142,7 +142,7 @@ func Mat4Perspective(angle, ratio, near, far float32) []float32 {
 	return Mat4Frustum(-top*ratio, top*ratio, -top, top, near, far)
 }
 
-func Mat4vec4Multi(m, v []float32) []float32 {
+func Mat4Vec4Multi(m, v []float32) []float32 {
 	return []float32{
 		m[0]*v[0] + m[4]*v[1] + m[8]*v[2] + m[12]*v[3],
 		m[1]*v[0] + m[5]*v[1] + m[9]*v[2] + m[13]*v[3],
@@ -215,6 +215,10 @@ func Vec3Distance(v1, v2 []float32) float32 {
 }
 func Vec2Distance(v1, v2 []float32) float32 {
 	return Vec2Magnitude(Vec2Substract(v1, v2))
+}
+
+func Vec3ToVec4(v []float32, c float32) []float32 {
+	return []float32{v[0], v[1], v[2], c}
 }
 
 func Vec3SurfaceNormal(s []float32, reverse int32) []float32 {
