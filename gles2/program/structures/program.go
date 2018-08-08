@@ -18,12 +18,12 @@ const vs = `
 		
 	varying vec2 v_texture_coord;
 	// light vector in tangent space
-	varying vec3 v_l;
+	varying vec3 v_light_tspace;
 	varying vec4 v_shadow_coord;
 		  
 	void main(void) {
 		v_texture_coord = a_texture_coord;
-		v_l = normalize(u_diffuse_vector * a_tspace_matrix);
+		v_light_tspace = normalize(u_diffuse_vector * a_tspace_matrix);
 		v_shadow_coord = u_shadowmap_matrix * vec4(a_vertex, 1.0);
 		gl_Position = u_merged_matrix * vec4(a_vertex, 1.0);
 	}
@@ -40,8 +40,7 @@ const fs = `
 	uniform sampler2D u_shadow_map;
 
 	varying vec2 v_texture_coord;
-	//light vector in tangent space
-	varying vec3 v_l;
+	varying vec3 v_light_tspace;
 	varying vec4 v_shadow_coord;
 
 	//diffuse = max(l.n, 0) * diffuse_light * diffuse_material
@@ -49,20 +48,18 @@ const fs = `
 	//n - per pixel normal vector in tangent space
 	void main(void) {
 		// shadow
-		vec4 shadow_coord_wd = v_shadow_coord / v_shadow_coord.w;
-		shadow_coord_wd.z += 0.0005;
-		float distance = texture2D(u_shadow_map, shadow_coord_wd.st).r;
+		float distance = texture2DProj(u_shadow_map, v_shadow_coord).r;
+		
 		float shadow = 1.0;
-	 	if (v_shadow_coord.w > 0.0)
-	 		shadow = distance < shadow_coord_wd.z ? 0.2 : 1.0 ;
-
-
+	 	if (v_shadow_coord.w > 0.0) {
+	 		shadow = distance < (v_shadow_coord.z / v_shadow_coord.w) ? 0.3 : 1.0;
+		}
 		// the material's diffuse color
 		vec3  diffuse_material = texture2D(u_texture, v_texture_coord.st).rgb;
 		vec4 nc = texture2D(u_texture_normal, v_texture_coord.st); 
 		// per pixel normal vector in tangent space
 		vec3 n = (nc.rgb * 2.0) - 1.0;
-		vec3 color = (u_ambient + shadow * max(dot(v_l, n), 0.0) * u_diffuse) * diffuse_material;
+		vec3 color = (u_ambient + shadow * max(dot(v_light_tspace, n), 0.0) * u_diffuse) * diffuse_material;
 		gl_FragColor = vec4(color, 1.0);
 	}
 `
